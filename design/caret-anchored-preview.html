@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MiniClip · 光标定位方案</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-width: 1120px;
+      background: #f2f2f2;
+      color: #252525;
+      font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    main { width: 1136px; margin: 0 auto; padding: 42px 0 48px; }
+    h1 { margin: 0; font-size: 23px; font-weight: 550; letter-spacing: -.02em; }
+    .intro { margin: 10px 0 30px; color: #696969; font-size: 13px; }
+    .variants { display: grid; grid-template-columns: repeat(2, 548px); gap: 40px; }
+    .variant-label { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 10px; }
+    .variant-label strong { font-size: 14px; font-weight: 600; }
+    .variant-label span { font-size: 12px; color: #777; }
+    .stage { position: relative; height: 438px; overflow: hidden; border: 1px solid #d8d8d8; border-radius: 14px; }
+    .stage.light { background: #fff; color: #292929; }
+    .stage.dark { background: #191919; color: #ebebeb; border-color: #363636; }
+    .page {
+      position: absolute; left: 54px; right: 54px; top: 43px;
+      font-size: 14px; line-height: 1.9; letter-spacing: .005em;
+    }
+    .page h2 { font-size: 18px; font-weight: 550; margin: 0 0 14px; }
+    .page p { margin: 0 0 8px; max-width: 440px; }
+    .light .page .secondary { color: #8b8b8b; }
+    .dark .page .secondary { color: #858585; }
+    .popup {
+      position: absolute; left: 139px; bottom: 59px;
+      width: 252px; padding: 5px 0;
+      border-radius: 8px; border: 1px solid;
+      overflow: hidden;
+      box-shadow: 0 7px 20px rgba(0,0,0,.11), 0 1px 2px rgba(0,0,0,.06);
+    }
+    .light .popup { background: #fff; border-color: #d6d6d6; color: #252525; }
+    .dark .popup { background: #222; border-color: #484848; color: #ededed; box-shadow: 0 8px 22px rgba(0,0,0,.3); }
+    .item {
+      display: flex; align-items: center;
+      height: 26px; padding: 0 11px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-size: 12px; line-height: 26px;
+    }
+    .item span { display: block; overflow: hidden; text-overflow: ellipsis; }
+    .light .item.selected { background: #ededed; }
+    .dark .item.selected { background: #373737; }
+    .typing {
+      position: absolute; left: 81px; bottom: 31px;
+      display: flex; align-items: center;
+      height: 24px; font-size: 14px;
+    }
+    .caret { display: inline-block; height: 19px; width: 1.5px; margin-left: 1px; background: currentColor; }
+    .caption { margin: 12px 0 0; color: #676767; font-size: 12px; line-height: 1.7; }
+    .spec { margin-top: 28px; padding-top: 16px; border-top: 1px solid #d9d9d9; color: #555; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>MiniClip · 光标定位方案</h1>
+    <p class="intro">候选框再收紧，并靠近文字光标。旧记录在上，最新记录在下；默认选中最下方。</p>
+    <div class="variants">
+      <section>
+        <div class="variant-label"><strong>白天</strong><span>约 252 × 142 DIP · 圆角 8 DIP</span></div>
+        <div class="stage light">
+          <div class="page"><h2>一段安静的文字</h2><p>让复制过的内容回到正在输入的位置。</p><p class="secondary">保持焦点，继续写下去。</p></div>
+          <div class="popup" aria-label="浅色剪贴板候选框，最下方为最新记录">
+            <div class="item"><span>docker compose up -d</span></div>
+            <div class="item"><span>git status</span></div>
+            <div class="item"><span>hello</span></div>
+            <div class="item"><span>SELECT * FROM users;</span></div>
+            <div class="item selected"><span>同一时刻，架中继无人机只为一架运输机提供保障。</span></div>
+          </div>
+          <div class="typing">写在这里<span class="caret" aria-label="文字插入光标"></span></div>
+        </div>
+        <p class="caption">候选框贴近文字插入光标；最新内容靠近光标，向上依次变旧。</p>
+      </section>
+      <section>
+        <div class="variant-label"><strong>黑夜</strong><span>同一尺寸与顺序</span></div>
+        <div class="stage dark">
+          <div class="page"><h2>一段安静的文字</h2><p>让复制过的内容回到正在输入的位置。</p><p class="secondary">保持焦点，继续写下去。</p></div>
+          <div class="popup" aria-label="深色剪贴板候选框，最下方为最新记录">
+            <div class="item"><span>docker compose up -d</span></div>
+            <div class="item"><span>git status</span></div>
+            <div class="item"><span>hello</span></div>
+            <div class="item"><span>SELECT * FROM users;</span></div>
+            <div class="item selected"><span>同一时刻，架中继无人机只为一架运输机提供保障。</span></div>
+          </div>
+          <div class="typing">写在这里<span class="caret" aria-label="文字插入光标"></span></div>
+        </div>
+        <p class="caption">不增加标题、图标或底部操作提示；只用灰阶区分当前项。</p>
+      </section>
+    </div>
+    <div class="spec">设计参考：弹窗约 252 × 142 DIP；单行 26 DIP，显示 5 条；优先显示在文字光标上方、间距约 4 px。当前程序已实现，实际效果以 WPF 自检截图为准。</div>
+  </main>
+</body>
+</html>

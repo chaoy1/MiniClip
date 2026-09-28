@@ -1,0 +1,110 @@
+<Window x:Class="MiniClip.UI.PopupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:MiniClip.UI"
+        Title="MiniClip"
+        Width="220"
+        Height="142"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Focusable="False"
+        ResizeMode="NoResize"
+        Topmost="True"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        FontFamily="{StaticResource UiFont}">
+
+    <Window.Resources>
+        <Style x:Key="RowTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="LineHeight" Value="16" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground" Value="{DynamicResource PopupTextBrush}" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <DataTemplate x:Key="ClipRowTemplate" DataType="{x:Type ui:ClipRow}">
+            <Grid Height="26">
+                <Border x:Name="Row" Margin="4,1,4,1"
+                        CornerRadius="6" Background="Transparent" SnapsToDevicePixels="True">
+                    <Grid Margin="10,0,9,0">
+                        <Grid VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource RowTextStyle}" Text="{Binding PreviewLine1}" />
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter TargetName="Row" Property="Background" Value="{DynamicResource PopupSelectionBrush}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid Background="Transparent">
+        <Border x:Name="Shell"
+                Background="{DynamicResource PopupSurfaceBrush}"
+                BorderBrush="{DynamicResource PopupBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="ShellTransform" />
+            </Border.RenderTransform>
+            <Grid ClipToBounds="True">
+                <ScrollViewer x:Name="ListScroller"
+                              Margin="0,5,0,5"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Focusable="False"
+                              PanningMode="VerticalOnly">
+                    <ScrollViewer.Resources>
+                        <Style TargetType="ScrollBar" BasedOn="{StaticResource HairlineScrollBar}" />
+                    </ScrollViewer.Resources>
+                    <ScrollViewer.Template>
+                        <ControlTemplate TargetType="ScrollViewer">
+                            <!-- Keep the content at the full popup width. The stock template
+                                 reserves a wide column even for a 2 DIP scroll indicator. -->
+                            <Grid>
+                                <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                        Content="{TemplateBinding Content}"
+                                                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                        CanContentScroll="{TemplateBinding CanContentScroll}" />
+                                <ScrollBar x:Name="PART_VerticalScrollBar"
+                                           Width="6"
+                                           HorizontalAlignment="Right"
+                                           Orientation="Vertical"
+                                           Maximum="{TemplateBinding ScrollableHeight}"
+                                           ViewportSize="{TemplateBinding ViewportHeight}"
+                                           Value="{Binding VerticalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
+                                           Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}" />
+                            </Grid>
+                        </ControlTemplate>
+                    </ScrollViewer.Template>
+                    <ItemsControl x:Name="RowList"
+                                  ItemsSource="{Binding Rows}"
+                                  ItemTemplate="{StaticResource ClipRowTemplate}"
+                                  Padding="0"
+                                  Focusable="False" />
+                </ScrollViewer>
+
+                <TextBlock x:Name="EmptyState"
+                           Text="暂无文本记录"
+                           Margin="11,0,11,0"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource PopupSecondaryTextBrush}"
+                           Visibility="Collapsed" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

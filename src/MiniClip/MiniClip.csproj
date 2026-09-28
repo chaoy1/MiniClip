@@ -1,0 +1,108 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- UseWindowsForms is only here for System.Drawing (tray icon artwork). This states
+         the DPI mode for the WinForms analyzer, which would otherwise warn about the
+         dpiAware/dpiAwareness entries in app.manifest — WPF reads those, WinForms reads
+         this, and they agree: PerMonitorV2. -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- WFO0003/WFAC010 are suppressed deliberately, not to silence noise. WPF is
+         system-DPI-aware by default and has to declare PerMonitorV2 in app.manifest; the
+         WinForms analyzer assumes a WinForms app and asks for ApplicationHighDpiMode
+         instead. Setting both is the documented resolution for a WPF app that merely
+         references WinForms, and the project property above already satisfies the
+         analyzer's intent. See dotnet/wpf#6811. -->
+    <NoWarn>$(NoWarn);WFO0003;WFAC010</NoWarn>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>MiniClip</RootNamespace>
+    <AssemblyName>MiniClip</AssemblyName>
+
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- MiniClip supplies its own Main (see App.xaml.cs) so the startup order is
+         explicit and readable: message window, then history, then hotkey, then tray.
+         Turning off the generated entry point is what makes that possible. -->
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <StartupObject>MiniClip.App</StartupObject>
+
+    <Product>MiniClip</Product>
+    <AssemblyTitle>MiniClip</AssemblyTitle>
+    <Description>不抢焦点的极简文本剪贴板</Description>
+    <Version>1.0.0</Version>
+
+    <!-- Startup and footprint targets from the project plan. -->
+    <PublishSingleFile>false</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <!-- InvariantGlobalization must stay false. Setting it true (tempting for a small
+         footprint) makes WPF's font cache throw TypeInitializationException from
+         MS.Internal.FontCache.MajorLanguages the first time text is laid out, which
+         breaks the popup entirely. CJK text also needs the real culture data. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <UseSystemResourceKeys>false</UseSystemResourceKeys>
+    <TieredPGO>true</TieredPGO>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <AutoreleasePoolSupport>false</AutoreleasePoolSupport>
+    <EventSourceSupport>false</EventSourceSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <NullabilityInfoContextSupport>false</NullabilityInfoContextSupport>
+
+    <!-- MiniClip never talks to the network. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <SatelliteResourceLanguages>en;zh-Hans</SatelliteResourceLanguages>
+
+    <ApplicationIcon>Assets\miniclip.ico</ApplicationIcon>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors>CS8600;CS8602;CS8603;CS8618;CS8625</WarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\miniclip.ico" />
+    <Resource Include="Assets\miniclip-tray.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Kept deliberately small: WPF's implicit usings do not cover these, and the
+         modules written by different hands all need them. Note that System.IO is NOT an
+         implicit using for a WPF app, which is a common surprise. -->
+    <Using Include="System.IO" />
+    <Using Include="System.Windows.Threading" />
+    <Using Include="System.Text.Json" />
+    <Using Include="MiniClip.Interop" />
+    <Using Include="MiniClip.History" />
+    <Using Include="MiniClip.Clipboard" />
+    <Using Include="MiniClip.UI" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- UseWindowsForms is only enabled for System.Drawing; its implicit usings bring in
+         System.Windows.Forms, which collides with WPF on Application, MessageBox,
+         KeyEventArgs and friends. Aliasing the WPF types explicitly means neither can be
+         picked up by accident. -->
+    <Using Include="System.Windows.Application" Alias="Application" />
+    <Using Include="System.Windows.MessageBox" Alias="MessageBox" />
+    <Using Include="System.Windows.MessageBoxButton" Alias="MessageBoxButton" />
+    <Using Include="System.Windows.MessageBoxImage" Alias="MessageBoxImage" />
+    <Using Include="System.Windows.MessageBoxResult" Alias="MessageBoxResult" />
+    <Using Include="System.Windows.Media.Brush" Alias="Brush" />
+    <Using Include="System.Windows.Input.KeyEventArgs" Alias="KeyEventArgs" />
+    <Using Include="System.Windows.Input.Key" Alias="Key" />
+    <Using Include="System.Windows.Input.ModifierKeys" Alias="ModifierKeys" />
+    <Using Include="System.Windows.Input.MouseEventArgs" Alias="MouseEventArgs" />
+    <Using Include="System.Windows.Input.MouseButtonEventArgs" Alias="MouseButtonEventArgs" />
+    <Using Include="System.Windows.Input.KeyboardFocusChangedEventArgs" Alias="KeyboardFocusChangedEventArgs" />
+    <Using Include="System.Windows.Input.Keyboard" Alias="Keyboard" />
+    <Using Include="System.Windows.Input.KeyInterop" Alias="KeyInterop" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,68 @@
+# MiniClip — 不要提交的文件
+
+## 发布产物
+
+发布版是二进制，不入库，改用 GitHub Releases 分发。
+
+`release/` 里的 `MiniClip.exe` 是 .NET 宿主，在没有运行时的机器上体积会到 140 MB 以上——
+GitHub 对单个文件的硬限制是 100 MB，超了会**直接拒绝推送**（需要付费 Git LFS）。所以发布产物
+一律不要 `git add`。
+
+```
+release/
+dist/
+*.pdb
+```
+
+## 构建中间产物
+
+由 `dotnet build` / `dotnet publish` 随时重建，包含本机绝对路径和机器特定的缓存。
+
+```
+bin/
+obj/
+publish/
+```
+
+## 验证与测量输出
+
+自检（`--selftest`）每次会写一批 PNG 快照和日志；`tools/measure-*.py` 会写发布体积对比。
+这些都是「跑一次就重新生成」的东西，体积却按百 MB 计，入库没有意义。
+
+```
+artifacts/
+```
+
+## 本地临时目录
+
+`tools/shoot-design.py` 用的独立 Chrome profile（设计截图）。几 MB，删掉会在下次运行时重建。
+
+```
+.design/
+```
+
+## 编辑器与系统
+
+```
+.vs/
+.vscode/
+*.user
+Thumbs.db
+desktop.ini
+```
+
+---
+
+## 发布流程建议
+
+```powershell
+# 1. 构建发布版（0.55 MB，框架依赖）
+dotnet publish src\MiniClip\MiniClip.csproj -c Release -r win-x64 `
+  -p:SelfContained=false -p:PublishSingleFile=false -o release\MiniClip-1.0.0-win-x64
+
+# 2. 构建安装包（Inno Setup，约 50 MB，用户无需自装运行时）
+powershell -File tools\build-installer.ps1
+```
+
+然后把 `dist\MiniClip-Setup-1.0.0-x64.exe` 作为 **GitHub Release 附件**上传，而不是提交进仓库。
+仓库里只放源码、文档和设计稿，保持几 MB 的克隆体积。

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>MiniClip — box-model probe</title>
+<link rel="stylesheet" href="miniclip.css">
+<style>
+  body { background: #fff; font-family: Consolas, monospace; font-size: 14px; line-height: 20px; padding: 16px; }
+  pre { margin: 0; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<pre id="out">running…</pre>
+<div id="host" style="position:absolute;left:-4000px;top:0"><div class="mc" data-theme="dark" id="stage"></div></div>
+<script src="miniclip.js"></script>
+<script>
+(function () {
+  'use strict';
+  var lines = [];
+  function log(s) { lines.push(s); }
+  function flush() { document.getElementById('out').textContent = lines.join('\n'); }
+  var host = document.getElementById('stage');
+
+  function measure(label, html, probe) {
+    host.innerHTML = html;
+    log('## ' + label);
+    try { probe(host); } catch (e) { log('!! ' + e.name + ': ' + e.message + ' @' + e.lineno); }
+    log('');
+  }
+
+  function run() {
+  try {
+    if (new URLSearchParams(location.search).get('zoom')) {
+      document.body.style.zoom = new URLSearchParams(location.search).get('zoom');
+    }
+
+  /* 1. default popup, 6 rows */
+  measure('default / 6 rows', MC.popupHtml({ items: MC.historyShort(), selected: 0, rows: 6 }), function (h) {
+    var p = h.querySelector('.mc-popup'), l = h.querySelector('.mc-list');
+    var rows = h.querySelectorAll('.mc-row');
+    log('popup  w=' + p.getBoundingClientRect().width + ' h=' + p.getBoundingClientRect().height);
+    log('list   w=' + l.getBoundingClientRect().width + ' clientH=' + l.clientHeight +
+        ' scrollH=' + l.scrollHeight + ' pad=' + getComputedStyle(l).paddingTop);
+    log('rows   n=' + rows.length + ' each=' +
+        Array.prototype.map.call(rows, function (r) { return r.getBoundingClientRect().height; }).join(','));
+    log('row0 children: ' + Array.prototype.map.call(rows[0].children, function (c) {
+      var b = c.getBoundingClientRect();
+      return c.className + '[' + Math.round(b.left) + ',' + Math.round(b.width) + 'x' + Math.round(b.height) + ']';
+    }).join(' '));
+    var t = h.querySelector('.mc-text');
+    log('text   x=' + t.getBoundingClientRect().left + ' w=' + t.getBoundingClientRect().width +
+        ' font=' + getComputedStyle(t).fontFamily.split(',')[0] + ' ' + getComputedStyle(t).fontSize +
+        '/' + getComputedStyle(t).lineHeight);
+    log('foot   h=' + h.querySelector('.mc-foot').getBoundingClientRect().height);
+    log('foot-hint h=' + h.querySelector('.mc-foot-hint').getBoundingClientRect().height);
+    var k = h.querySelector('.mc-key');
+    log('  key  h=' + k.getBoundingClientRect().height + ' (grid row)');
+    /* does the row text overflow or ellipsize? */
+    log('row0 text scrollW=' + t.scrollWidth + ' clientW=' + t.clientWidth +
+        (t.scrollWidth > t.clientWidth ? '  -> ELLIPSIS' : '  -> fits'));
+  });
+
+  /* 2. 30 items */
+  measure('30 items / 6 rows', MC.popupHtml({ items: MC.historyFull(), selected: 3, rows: 6 }), function (h) {
+    var l = h.querySelector('.mc-list');
+    log('list clientH=' + l.clientHeight + ' scrollH=' + l.scrollHeight + ' canScroll=' + (l.scrollHeight > l.clientHeight));
+    log('popup h=' + h.querySelector('.mc-popup').getBoundingClientRect().height);
+  });
+
+  /* 3. empty */
+  measure('empty', MC.popupHtml({ items: [], foot: 'empty' }), function (h) {
+    var p = h.querySelector('.mc-popup');
+    log('popup w=' + p.getBoundingClientRect().width + ' h=' + p.getBoundingClientRect().height);
+    log('empty h3=' + h.querySelector('.mc-empty h3').getBoundingClientRect().height +
+        ' p=' + h.querySelector('.mc-empty p').getBoundingClientRect().height);
+    log('foot h=' + h.querySelector('.mc-foot').getBoundingClientRect().height);
+  });
+
+  /* 4. multiline row */
+  measure('multiline selected (4-line commit message)',
+    MC.popupHtml({ items: MC.historyShort(), selected: 5, rows: 6 }), function (h) {
+    var r = h.querySelector('.mc-row.is-selected');
+    var t = r.querySelector('.mc-text');
+    log('row h=' + r.getBoundingClientRect().height);
+    log('text class=' + t.className + ' h=' + t.getBoundingClientRect().height +
+        ' scrollH=' + t.scrollHeight);
+    log('lines marker=' + r.querySelector('.mc-lines').textContent.trim());
+    log('preview lines:');
+    MC.preview(MC.historyShort()[5].text).lines.forEach(function (l, j) {
+      log('   line' + j + ' len=' + l.length + ' <' + l.replace(/ /g, '·') + '>');
+    });
+    var ls = r.querySelectorAll('.mc-ln');
+    log('line boxes in DOM = ' + ls.length);
+    Array.prototype.forEach.call(ls, function (n, j) {
+      var b = n.getBoundingClientRect();
+      log('   box' + j + ' top=' + Math.round(b.top) + ' h=' + Math.round(b.height) +
+          ' text=<' + n.textContent + '>');
+    });
+  });
+
+  /* 5. long single line */
+  measure('long URL selected', MC.popupHtml({ items: MC.BASE.slice(0, 8), selected: 6, rows: 6 }), function (h) {
+    var t = h.querySelector('.mc-row.is-selected .mc-text');
+    log('row h=' + h.querySelector('.mc-row.is-selected').getBoundingClientRect().height);
+    log('text clientW=' + t.clientWidth + ' scrollW=' + t.scrollWidth +
+        (t.scrollWidth > t.clientWidth ? '  -> ELLIPSIS' : '  -> fits'));
+    log('preview lines=' + MC.preview(MC.BASE[6]).lines.length +
+        ' firstLen=' + MC.preview(MC.BASE[6]).lines[0].length);
+  });
+
+  /* 6. whitespace-only entry */
+  measure('blank entry (3 spaces)', MC.popupHtml({ items: MC.BASE.slice(0, 8), selected: 7, rows: 6 }), function (h) {
+    log('preview=' + JSON.stringify(MC.preview(MC.BASE[7])));
+    log('echo=' + JSON.stringify(MC.echo(MC.BASE[7])));
+    log('row h=' + h.querySelector('.mc-row.is-selected').getBoundingClientRect().height);
+    log('rendered=<' + h.querySelector('.mc-row.is-selected .mc-text').textContent + '>');
+  });
+
+  /* 6b. the whole list as texts, to eyeball the display transform */
+  measure('preview of all 10 base payloads', MC.popupHtml({ items: MC.historyShort(), selected: -1, rows: 6 }), function (h) {
+    MC.historyShort().forEach(function (it, i) {
+      var p = MC.preview(it.text);
+      log('  ' + i + '  kind=' + p.kind + ' n=' + p.total + (p.badge ? '  [' + p.badge + ']' : ''));
+      p.lines.forEach(function (l, j) {
+        log('       line' + j + ' len=' + l.length + ' <' + l.replace(/ /g, '·') + '>');
+      });
+      var t = h.querySelectorAll('.mc-text')[i];
+      log('       dom  clientW=' + t.clientWidth + ' scrollW=' + t.scrollWidth +
+          (t.scrollWidth > t.clientWidth ? '  ELLIPSIS' : '  fits') +
+          '  rowH=' + t.parentNode.getBoundingClientRect().height);
+    });
+  });
+
+  /* 7. tray menu + dialog */
+  measure('tray menu (conflict)', MC.menuHtml({ conflict: true, hotkey: 'Alt+V', hasHistory: true }), function (h) {
+    log('menu w=' + h.querySelector('.mc-menu').getBoundingClientRect().width +
+        ' h=' + h.querySelector('.mc-menu').getBoundingClientRect().height);
+  });
+  measure('dialog (conflict)', MC.dialogHtml({ state: 'conflict', hotkey: 'Alt+V', autostart: true }), function (h) {
+    log('dialog w=' + h.querySelector('.mc-dialog').getBoundingClientRect().width +
+        ' h=' + h.querySelector('.mc-dialog').getBoundingClientRect().height);
+    log('record h=' + h.querySelector('.mc-record').getBoundingClientRect().height);
+  });
+
+  /* 8. fonts actually resolved — width of a shared string vs. the two fallbacks */
+  var probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;visibility:hidden;font-size:13px;white-space:pre';
+  document.body.appendChild(probe);
+  /* per-character advance for ASCII + a CJK glyph, which is what actually
+     decides whether the stack fell through to a different face */
+  function advance(fam, s) {
+    probe.style.fontFamily = fam;
+    probe.textContent = s;
+    return probe.getBoundingClientRect().width;
+  }
+  log('viewport cssRatio check: 100px div =>');
+  var cal = document.createElement('div');
+  cal.style.cssText = 'position:absolute;width:100px;height:100px;visibility:hidden';
+  document.body.appendChild(cal);
+  log('  100px box measures ' + cal.getBoundingClientRect().width + '  devicePixelRatio=' + window.devicePixelRatio);
+  log('  window.innerWidth=' + window.innerWidth + ' innerHeight=' + window.innerHeight +
+      ' screen=' + screen.width + 'x' + screen.height +
+      ' avail=' + screen.availWidth + 'x' + screen.availHeight);
+  log('  screen DIP check: 1in ruler = ' + (function () {
+    var d = document.createElement('div');
+    d.style.cssText = 'position:absolute;width:1in;visibility:hidden';
+    document.body.appendChild(d);
+    return d.getBoundingClientRect().width;
+  })() + 'px');
+  ['"Cascadia Mono"', 'Consolas', 'monospace',
+   '"Segoe UI Variable Text"', '"Segoe UI"', 'sans-serif',
+   '"Microsoft YaHei UI"', '"Microsoft YaHei"', '"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI"'].forEach(function (f) {
+    log('  ' + f.padEnd(58) + ' ascii=' + advance(f, 'MMMMMMMMMM').toFixed(2) +
+        '  cjk=' + advance(f, '暂无文本记录').toFixed(2) + '  1/0=' +
+        advance(f, '1').toFixed(2) + '/' + advance(f, '0').toFixed(2) +
+        '  i/l=' + advance(f, 'i').toFixed(2) + '/' + advance(f, 'l').toFixed(2));
+  });
+
+  /* 9. column budget check: does the preview budget still fit the column? */
+  measure('column budget', MC.popupHtml({ items: MC.historyShort(), selected: 5, rows: 6 }), function (h) {
+    var t = h.querySelector('.mc-row.is-selected .mc-text');
+    var cs = getComputedStyle(t);
+    var m = document.createElement('span');
+    m.style.cssText = 'position:absolute;top:-9999px;white-space:pre;font-family:' + cs.fontFamily +
+      ';font-size:' + cs.fontSize + ';font-weight:' + cs.fontWeight;
+    document.body.appendChild(m);
+    function w(s) { m.textContent = s; return m.getBoundingClientRect().width; }
+    var latin = w('M'), cjk = w('永'), dot = w('·'), ell = w('…');
+    log('advance @13/500: latin=' + latin.toFixed(3) + '  cjk=' + cjk.toFixed(3) +
+        '  ·=' + dot.toFixed(3) + '  …=' + ell.toFixed(3));
+    m.style.fontWeight = '400';
+    log('advance @13/400: latin=' + w('M').toFixed(3) + '  cjk=' + w('永').toFixed(3));
+    document.body.removeChild(m);
+    log('content box = ' + t.clientWidth + ' DIP (weight ' + cs.fontWeight + ')');
+    log('budget COLS=' + MC.COLS + ' -> latin max ' + (MC.COLS * latin).toFixed(1) +
+        ' DIP, all-CJK ' + (MC.COLS * cjk).toFixed(1) + ' DIP');
+    var worst = 0, worstTxt = '';
+    Array.prototype.forEach.call(h.querySelectorAll('.mc-ln'), function (n) {
+      var b = n.getBoundingClientRect().width;
+      if (b > worst) { worst = b; worstTxt = n.textContent; }
+      log('   line cols=' + MC.strCols(n.textContent) + ' chars=' + n.textContent.length +
+          ' w=' + b.toFixed(1) + (b > 353 ? '  ** WIDER THAN COLUMN **' : ''));
+    });
+    log('widest line = ' + worst.toFixed(1) + ' DIP  [' + worstTxt.slice(0, 24) + ']');
+  });
+
+  /* 9b. column budget under stress: 60 latin, 30 cjk, mixed, and leading indent */
+  measure('budget stress', MC.popupHtml({
+    items: [
+      { text: 'M'.repeat(60) },
+      { text: '永'.repeat(30) },
+      { text: '永'.repeat(20) + 'M'.repeat(20) },
+      { text: '    indented_command --with-flags --and-more-flags value' },
+      { text: 'SELECT * FROM users WHERE email LIKE \'%@example.com\' AND active = 1;' },
+      { text: 'a\n' + '永'.repeat(40) + '\nb' }
+    ], selected: -1, rows: 6
+  }), function (h) {
+    Array.prototype.forEach.call(h.querySelectorAll('.mc-row'), function (r, i) {
+      var t = r.querySelector('.mc-text');
+      var lines = [];
+      Array.prototype.forEach.call(r.querySelectorAll('.mc-ln'), function (n) {
+        lines.push(MC.strCols(n.textContent) + 'col/' +
+          n.getBoundingClientRect().width.toFixed(1) + 'px');
+      });
+      log('   row' + i + ' clientW=' + t.clientWidth + '  ' + lines.join('  '));
+    });
+    log('COLS budget = ' + MC.COLS + '  => latin max ' + (MC.COLS * 7.617).toFixed(1) +
+        ' DIP, cjk max ' + (MC.COLS * 13).toFixed(1) + ' DIP  (column is 353)');
+  });
+
+  /* 12. ellipsis glyph coverage in the content face */
+  measure('ellipsis glyph', '<span id="e1" style="font-family:\'Cascadia Mono\',Consolas,monospace;font-size:13px">\u2026</span>' +
+    '<span id="e2" style="font-family:\'Cascadia Mono\',Consolas,monospace;font-size:13px">...</span>' +
+    '<span id="e3" style="font-family:\'Cascadia Mono\',Consolas,monospace;font-size:13px">M</span>' +
+    '<span id="e4" style="font-family:\'Cascadia Mono\',Consolas,monospace;font-size:13px">\uFFFD</span>', function () {
+    function w(id) { return document.getElementById(id).getBoundingClientRect().width.toFixed(3); }
+    log('  U+2026 …      = ' + w('e1'));
+    log('  "..."         = ' + w('e2'));
+    log('  M             = ' + w('e3'));
+    log('  U+FFFD        = ' + w('e4'));
+    log('  MC.ELLIPSIS   = ' + JSON.stringify(MC.ELLIPSIS));
+    var wide = document.getElementById('e1').getBoundingClientRect().width;
+    var mono = document.getElementById('e3').getBoundingClientRect().width;
+    log('  => U+2026 is ' + (wide > mono * 2.5 ? 'rendered as a WIDE fallback glyph (foreign face)'
+        : wide > 0 ? 'present' : 'MISSING'));
+  });
+
+  /* 13. the clipped row, as actually rendered */
+  measure('clipped row rendering', MC.popupHtml({ items: MC.historyFull(), selected: 8, rows: 6 }), function (h) {
+    var r = h.querySelector('.mc-row.is-selected');
+    var ln = r.querySelector('.mc-ln');
+    log('  code points of the rendered line: ' +
+        Array.prototype.map.call(ln.textContent, function (ch) { return ch.charCodeAt(0); }).slice(-4).join(','));
+    log('  text=<' + ln.textContent + '>');
+    log('  width=' + ln.getBoundingClientRect().width.toFixed(1) + ' avail=' +
+        r.querySelector('.mc-text').clientWidth);
+  });
+
+  measure('selected vs unselected geometry (30-item list)',
+    MC.popupHtml({ items: MC.historyFull(), selected: 8, rows: 6 }), function (h) {
+    var rows = h.querySelectorAll('.mc-row');
+    [7, 8, 9].forEach(function (i) {
+      var r = rows[i], t = r.querySelector('.mc-text');
+      var ln = r.querySelector('.mc-ln') || r.querySelector('.mc-blank');
+      var txt = ln ? ln.textContent : '';
+      var m = document.createElement('span');
+      var cs = getComputedStyle(t);
+      m.style.cssText = 'position:absolute;top:-9999px;white-space:pre;font-family:' + cs.fontFamily +
+        ';font-size:' + cs.fontSize + ';font-weight:' + cs.fontWeight +
+        ';font-style:' + cs.fontStyle;
+      m.textContent = txt;
+      document.body.appendChild(m);
+      var need = m.getBoundingClientRect().width;
+      document.body.removeChild(m);
+      log('  row' + i + (r.classList.contains('is-selected') ? ' SELECTED' : '         ') +
+          ' weight=' + cs.fontWeight + ' cols=' + MC.strCols(txt) +
+          ' chars=' + txt.length + '  needs=' + need.toFixed(1) +
+          '  avail=' + t.clientWidth + (need > t.clientWidth ? '   >> OVERFLOW' : '   ok'));
+      log('        text=<' + txt + '>');
+    });
+    /* the widest possible line under the budget, at both weights */
+    var probe2 = document.createElement('span');
+    probe2.style.cssText = 'position:absolute;top:-9999px;white-space:pre;font-family:' +
+      getComputedStyle(rows[8].querySelector('.mc-text')).fontFamily + ';font-size:13px';
+    document.body.appendChild(probe2);
+    ['400', '500'].forEach(function (w) {
+      probe2.style.fontWeight = w;
+      probe2.textContent = 'M'.repeat(43) + '…';
+      log('  budget-max "M"*43+… at weight ' + w + ' = ' +
+          probe2.getBoundingClientRect().width.toFixed(1) + ' DIP');
+    });
+    document.body.removeChild(probe2);
+  });
+  /* 10. theme token resolution */
+  ['dark', 'light'].forEach(function (th) {
+    host.setAttribute('data-theme', th);
+    host.innerHTML = MC.popupHtml({ items: MC.historyShort(), selected: 0, rows: 6 });
+    var cs = getComputedStyle(h.querySelector('.mc-popup'));
+    log(th + '  surface=' + cs.backgroundColor + '  rail=' +
+        getComputedStyle(h.querySelector('.mc-row.is-selected .mc-rail')).backgroundColor +
+        '  text=' + getComputedStyle(h.querySelector('.mc-text')).color);
+  });
+
+  document.getElementById('out').textContent = lines.join('\n');
+  document.title = 'probe done';
+  } catch (e) { log('FATAL ' + e.name + ': ' + e.message + ' @line ' + e.lineno); flush(); }
+  }
+  if (document.readyState === 'complete') run();
+  else window.addEventListener('load', run);
+  window.addEventListener('error', function (ev) {
+    log('WINDOW ERROR: ' + ev.message + ' @' + ev.lineno + ':' + ev.colno);
+    flush();
+  });
+})();
+</script>
+</body>
+</html>

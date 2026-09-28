@@ -1,0 +1,263 @@
+<Window x:Class="MiniClip.UI.HotkeySettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="设置"
+        Width="340"
+        SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        FontFamily="{StaticResource UiFont}">
+
+    <Window.Resources>
+        <!-- A stock WPF CheckBox renders a light-themed box that reads as a control from
+             a different application on this surface, so it is templated: 14 DIP, 3 DIP
+             radius, accent fill when on, with the check drawn as two borders. -->
+        <Style x:Key="ToggleStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource ChromeTextBrush}" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeChrome}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal" Background="Transparent">
+                            <Border x:Name="Box"
+                                    Width="14"
+                                    Height="14"
+                                    VerticalAlignment="Center"
+                                    CornerRadius="3"
+                                    Background="{DynamicResource ChromeFieldBrush}"
+                                    BorderBrush="{DynamicResource ChromeBorderBrush}"
+                                    BorderThickness="1">
+                                <Path x:Name="Tick"
+                                      Data="M 0,3.4 L 3,6.4 L 8,0.6"
+                                      Stroke="{DynamicResource ChromePrimaryTextBrush}"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Visibility="Collapsed" />
+                            </Border>
+                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource ChromePrimaryBrush}" />
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource ChromePrimaryBrush}" />
+                                <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource ChromePrimaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource FontSizeChrome}" />
+            <Setter Property="Foreground" Value="{DynamicResource ChromeMutedBrush}" />
+            <Setter Property="Margin" Value="0,0,0,5" />
+        </Style>
+
+        <Style x:Key="NoteStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource FontSizeChrome}" />
+            <Setter Property="LineHeight" Value="18" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource ChromeErrorBrush}" />
+        </Style>
+
+        <Style x:Key="ButtonBase" TargetType="Button">
+            <Setter Property="FontSize" Value="{StaticResource FontSizeChrome}" />
+            <Setter Property="Foreground" Value="{DynamicResource ChromeTextBrush}" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{DynamicResource ChromeFieldBrush}"
+                                CornerRadius="{StaticResource KeyCornerRadius}"
+                                BorderBrush="{DynamicResource ChromeBorderBrush}"
+                                BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource ChromeTextBrush}" />
+                            </Trigger>
+                            <!-- Keyboard focus must stay visible: this dialog can be driven
+                                 entirely from the keyboard, which is how the user got here. -->
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource ChromePrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+            <Setter Property="Foreground" Value="{DynamicResource ChromePrimaryTextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{DynamicResource ChromePrimaryBrush}"
+                                CornerRadius="{StaticResource KeyCornerRadius}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="Transparent">
+        <Border x:Name="SettingsShell" CornerRadius="10" Focusable="True" FocusVisualStyle="{x:Null}"
+                Background="{DynamicResource ChromeSurfaceBrush}"
+                BorderBrush="{DynamicResource ChromeBorderBrush}"
+                BorderThickness="1">
+            <StackPanel Margin="21">
+                <TextBlock Text="设置"
+                           FontSize="{StaticResource FontSizeContent}"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource ChromeTextBrush}" />
+                <TextBlock Text="快捷键、启动与数据"
+                           Margin="0,2,0,14"
+                           FontSize="{StaticResource FontSizeChrome}"
+                           LineHeight="18"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource ChromeMutedBrush}" />
+
+                <TextBlock Style="{StaticResource FieldLabelStyle}" Text="全局快捷键" />
+
+                <!-- The recording field is the whole interaction: click it and press the
+                     combination you want. It reports its own state in place, so a refusal
+                     from Windows is visible at the moment it happens. -->
+                <Border x:Name="RecordBox"
+                        MinHeight="38"
+                        Padding="10,0"
+                        CornerRadius="{StaticResource KeyCornerRadius}"
+                        Background="{DynamicResource ChromeFieldBrush}"
+                        BorderBrush="{DynamicResource ChromeBorderBrush}"
+                        BorderThickness="1"
+                        Cursor="Hand"
+                        Focusable="True"
+                        FocusVisualStyle="{x:Null}"
+                        MouseLeftButtonDown="OnRecordBoxClick"
+                        GotKeyboardFocus="OnRecordBoxGotFocus">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock x:Name="GestureText"
+                                   Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontFamily="{StaticResource MonoFont}"
+                                   FontSize="{StaticResource FontSizeContent}"
+                                   Foreground="{DynamicResource ChromeTextBrush}"
+                                   Text="Alt + V" />
+
+                        <Rectangle x:Name="RecordingCursor"
+                                   Grid.Column="0"
+                                   Width="2"
+                                   Height="16"
+                                   HorizontalAlignment="Left"
+                                   Margin="0,0,0,0"
+                                   Fill="{DynamicResource ChromePrimaryBrush}"
+                                   Visibility="Collapsed" />
+
+                        <TextBlock x:Name="StateText"
+                                   Grid.Column="1"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0"
+                                   FontSize="{StaticResource FontSizeChrome}"
+                                   Foreground="{DynamicResource ChromeMutedBrush}"
+                                   Text="已生效" />
+                    </Grid>
+                </Border>
+
+                <StackPanel x:Name="NoteBox" Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock x:Name="NoteMark"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="{StaticResource FontSizeChrome}"
+                               Foreground="{DynamicResource ChromeErrorBrush}"
+                               Text="!"
+                               Margin="0,0,6,0" />
+                    <TextBlock x:Name="NoteText" Style="{StaticResource NoteStyle}" />
+                </StackPanel>
+
+                <CheckBox x:Name="StartWithWindows"
+                          Style="{StaticResource ToggleStyle}"
+                          Margin="0,14,0,0">
+                    <TextBlock>
+                        <Run Text="开机自动启动" />
+                        <Run Text="  登录后常驻托盘" Foreground="{DynamicResource ChromeMutedBrush}" />
+                    </TextBlock>
+                </CheckBox>
+
+                <Border Height="1" Margin="0,17,0,12"
+                        Background="{DynamicResource ChromeBorderBrush}" />
+                <TextBlock Text="历史与数据"
+                           FontSize="{StaticResource FontSizeChrome}"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource ChromeTextBrush}" />
+                <TextBlock x:Name="HistoryCountText"
+                           Text="历史记录 · 0 条"
+                           Margin="0,5,0,10"
+                           FontSize="{StaticResource FontSizeChrome}"
+                           Foreground="{DynamicResource ChromeMutedBrush}" />
+                <Button x:Name="OpenHistoryFolderButton"
+                        Style="{StaticResource ButtonBase}"
+                        Content="打开历史文件位置"
+                        HorizontalAlignment="Left"
+                        Click="OnOpenHistoryFolderClick" />
+                <TextBlock Text="历史以明文保存在本机，不联网、不上传。"
+                           Margin="0,10,0,0"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource ChromeMutedBrush}" />
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+                    <Button x:Name="CancelButton"
+                            Style="{StaticResource ButtonBase}"
+                            Content="关闭"
+                            IsCancel="True"
+                            Click="OnCancelClick" />
+                    <Button x:Name="SaveButton"
+                            Style="{StaticResource PrimaryButton}"
+                            Content="保存"
+                            Margin="8,0,0,0"
+                            IsDefault="True"
+                            Click="OnSaveClick" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

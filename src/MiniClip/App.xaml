@@ -1,0 +1,57 @@
+<Application x:Class="MiniClip.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="UI/Tokens.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- The list's hairline scrollbar lives here rather than in PopupWindow.xaml
+                 because a nested ResourceDictionary cannot reliably resolve
+                 BasedOn="{StaticResource ...}" against the enclosing Window.Resources: the
+                 lookup walks the parse-time tree and does not see it. This fails only in a
+                 compiled Release XAML build — Debug tolerates it — so it is the kind of
+                 defect that ships if the two configurations are never both exercised.
+                 Defined at application scope, the key is resolvable from anywhere. -->
+            <Style x:Key="HairlineScrollBar" TargetType="ScrollBar">
+                <Setter Property="Width" Value="6" />
+                <Setter Property="Opacity" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ScrollBar">
+                            <Grid Background="Transparent">
+                                <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False" />
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False" />
+                                    </Track.IncreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb Focusable="False">
+                                            <Thumb.Template>
+                                                <ControlTemplate TargetType="Thumb">
+                                                    <!-- A capsule, not a trough-and-arrows widget:
+                                                         this exists to confirm overflow, not to
+                                                         be dragged. The list is driven by ↑ ↓. -->
+                                                    <Border Width="2"
+                                                            HorizontalAlignment="Right"
+                                                            Margin="0,6,2,6"
+                                                            CornerRadius="1"
+                                                            Background="{DynamicResource PopupScrollBrush}" />
+                                                </ControlTemplate>
+                                            </Thumb.Template>
+                                        </Thumb>
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

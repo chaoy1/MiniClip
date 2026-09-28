@@ -1,0 +1,778 @@
+/* ============================================================================
+   MiniClip — design tokens + component styles
+   One file, no build step, no network.  Open index.html or states.html directly.
+   Every px value in this file is a WPF device-independent pixel (DIP).
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- tokens -- */
+.mc {
+  /* -- dark (primary).  Family: blue-slate, not neutral near-black. */
+  --mc-surface:        #0F141B; /* ink-900   popup paper                       */
+  --mc-surface-wash:   #121925; /* ink-850   selected row wash, fields        */
+  --mc-hairline:       #2C3A4C; /* ink-700   dividers, scroll thumb           */
+  --mc-hairline-soft:  rgba(231, 237, 244, 0.10); /* menu/row hairline         */
+  --mc-text:           #E7EDF4; /* paper-050 payload, primary content         */
+  --mc-text-chrome:    #94A5BA; /* paper-500 chrome, 2nd preview line         */
+  --mc-accent:         #6FD3B4; /* signal-500  SELECTION ONLY                 */
+  --mc-accent-ink:     #0F141B; /* text drawn on top of the accent            */
+  /* Selected row: a mint-tinted slab, not a grey one.  Against a navy base a
+     neutral wash reads as "one step lighter"; a tinted one reads as "chosen",
+     which is the only thing this pixel may say. */
+  --mc-wash-selected:  #16332F;
+  --mc-accent-wash:    rgba(111, 211, 180, 0.10);
+  --mc-accent-stroke:  rgba(111, 211, 180, 0.34);
+  --mc-focus-ring:     rgba(111, 211, 180, 0.34);
+  --mc-caution:        #E0A94A; /* caution-450 hotkey conflict / reg. failure */
+  --mc-danger:         #E8826B; /* danger-450  paste failure, destructive     */
+  --mc-inset:          inset 0 1px 0 rgba(231, 237, 244, 0.07); /* edge light   */
+  --mc-shadow-panel:   0 0 0 1px rgba(0, 0, 0, 0.30),
+                       0 14px 34px -10px rgba(0, 0, 0, 0.62),
+                       0 3px 9px -4px rgba(0, 0, 0, 0.45);
+  --mc-shadow-menu:    0 0 0 1px rgba(0, 0, 0, 0.28),
+                       0 10px 26px -8px rgba(0, 0, 0, 0.58),
+                       0 2px 6px -3px rgba(0, 0, 0, 0.40);
+  --mc-shadow-dialog:  0 0 0 1px rgba(0, 0, 0, 0.32),
+                       0 26px 64px -16px rgba(0, 0, 0, 0.70),
+                       0 6px 18px -8px rgba(0, 0, 0, 0.50);
+  --mc-shadow-key:     0 1px 0 rgba(0, 0, 0, 0.35);
+  --mc-scrim:          rgba(7, 10, 15, 0.55);
+
+  /* -- type ---------------------------------------------------------------- */
+  /* Content face: Cascadia MONO, not Cascadia Code — the Code cut carries
+     programming ligatures, and a clipboard must never draw a glyph that is not
+     the character the user copied.  Microsoft YaHei UI is named explicitly
+     because Cascadia and Consolas have no CJK coverage: relying on GDI font
+     linking for 暂无文本记录 gives a different weight and a different baseline
+     from the Latin around it.  Measured: YaHei UI is 15.5% wider than the
+     `sans-serif` fallback, so the difference is real. */
+  --mc-font-mono: "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace;
+  --mc-font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI",
+                sans-serif;
+
+  --mc-fs-content: 13px;  --mc-lh-content: 20px;
+  --mc-fs-chrome:  12px;  --mc-lh-chrome:  16px;
+  --mc-fs-title:   13px;  --mc-lh-title:   20px;
+
+  /* -- geometry ------------------------------------------------------------ */
+  --mc-popup-w:   400px;
+  --mc-row-h:     40px;
+  --mc-gutter-w:  14px;
+  --mc-right-w:   24px;
+  --mc-text-inset: 0px;
+  --mc-rad-popup: 10px;
+  --mc-rad-menu:  6px;
+  --mc-rad-dialog: 12px;
+  --mc-rad-rail:  2px;
+  --mc-rad-key:   4px;
+
+  /* -- motion -------------------------------------------------------------- */
+  --mc-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --mc-t-appear:  90ms;
+  --mc-t-dismiss: 70ms;
+  --mc-t-row:     70ms;
+  --mc-t-confirm: 160ms;
+  --mc-t-menu:    120ms;
+}
+
+/* -- light: same structure, same selection language, re-derived palette ---- */
+.mc[data-theme="light"] {
+  --mc-surface:        #FFFFFF;
+  --mc-surface-wash:   #EDF2F8;
+  --mc-hairline:       #D3DCE6;
+  --mc-hairline-soft:  rgba(19, 26, 35, 0.09);
+  --mc-text:           #131A23;
+  --mc-text-chrome:    #56637A;
+  --mc-accent:         #0D7261;
+  --mc-accent-ink:     #FFFFFF;
+  --mc-wash-selected:  #DCEFE9;
+  --mc-accent-wash:    rgba(13, 114, 97, 0.09);
+  --mc-accent-stroke:  rgba(13, 114, 97, 0.40);
+  --mc-focus-ring:     rgba(13, 114, 97, 0.36);
+  --mc-caution:        #8A5B00;
+  --mc-danger:         #B03A24;
+  --mc-inset:          inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --mc-shadow-panel:   0 0 0 1px rgba(19, 26, 35, 0.06),
+                       0 14px 30px -12px rgba(19, 26, 35, 0.30),
+                       0 3px 8px -4px rgba(19, 26, 35, 0.16);
+  --mc-shadow-menu:    0 0 0 1px rgba(19, 26, 35, 0.07),
+                       0 10px 24px -10px rgba(19, 26, 35, 0.28),
+                       0 2px 6px -3px rgba(19, 26, 35, 0.14);
+  --mc-shadow-dialog:  0 0 0 1px rgba(19, 26, 35, 0.08),
+                       0 26px 60px -18px rgba(19, 26, 35, 0.34),
+                       0 6px 16px -8px rgba(19, 26, 35, 0.18);
+  --mc-shadow-key:     0 1px 0 rgba(19, 26, 35, 0.10);
+  --mc-scrim:          rgba(19, 26, 35, 0.28);
+}
+
+/* Reduced motion is honoured for the whole system, not just the panel entrance:
+   the popping/fading of a menu or dialog is the same class of decoration. */
+.mc { --mc-motion: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .mc { --mc-motion: 0; }
+}
+
+/* ------------------------------------------------------------ primitives -- */
+.mc { color: var(--mc-text); }
+
+.mc-card {
+  background: var(--mc-surface);
+  border-radius: var(--mc-rad-popup);
+  box-shadow: var(--mc-inset), var(--mc-shadow-panel);
+}
+
+.mc-kbd {
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-fs-content);
+  line-height: 1;
+  color: var(--mc-text);
+  padding: 2px 5px;
+  border-radius: var(--mc-rad-key);
+  background: var(--mc-surface-wash);
+  box-shadow: inset 0 0 0 1px var(--mc-hairline-soft), var(--mc-shadow-key);
+}
+
+/* ============================================================== popup ===== */
+.mc-popup {
+  width: var(--mc-popup-w);
+  background: var(--mc-surface);
+  border-radius: var(--mc-rad-popup);
+  box-shadow: var(--mc-inset), var(--mc-shadow-panel);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: mc-appear calc(var(--mc-t-appear) * var(--mc-motion)) var(--mc-ease) both;
+  animation-delay: var(--mc-delay, 0ms);
+  transform-origin: 22% 0%;
+}
+.mc-popup[hidden] { display: none; }
+.mc-popup.is-closing { animation: mc-dismiss var(--mc-t-dismiss) var(--mc-ease) both; }
+
+@keyframes mc-appear {
+  from { opacity: 0; transform: translateY(2px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes mc-dismiss { to { opacity: 0; } }
+@keyframes mc-confirm {
+  0%   { opacity: 0; transform: translateY(2px); }
+  60%  { opacity: 1; transform: none; }
+  100% { opacity: 1; }
+}
+@keyframes mc-pop { from { opacity: 0; transform: translateY(3px) scale(0.985); } }
+
+/* --- list ---------------------------------------------------------------- */
+.mc-list {
+  position: relative;
+  padding: 10px 0;
+  background: var(--mc-surface);
+}
+
+.mc-row {
+  position: relative;
+  height: var(--mc-row-h);
+  display: flex;
+  align-items: center;
+  padding-left: var(--mc-gutter-w);
+  padding-right: 6px;
+  border-radius: 0;
+  transition: background-color var(--mc-t-row) var(--mc-ease),
+              box-shadow var(--mc-t-row) var(--mc-ease);
+}
+.mc-row + .mc-row { box-shadow: inset 0 1px 0 var(--mc-hairline-soft); }
+
+.mc-row:hover { background: var(--mc-surface-wash); }
+
+.mc-row.is-selected {
+  background: var(--mc-wash-selected);
+  box-shadow: inset 0 1px 0 var(--mc-accent-stroke),
+              inset 0 0 0 1px var(--mc-accent-stroke);
+}
+
+/* rail — 3x20, drawn only for the selected row; its vertical placement inside
+   the row is set inline by the renderer, which is what encodes position. */
+.mc-rail {
+  position: absolute;
+  left: 0; top: 10px;
+  width: 3px; height: 20px;
+  border-radius: var(--mc-rad-rail);
+  background: var(--mc-accent);
+  opacity: 0;
+  transition: opacity var(--mc-t-row) var(--mc-ease);
+}
+.mc-row.is-selected .mc-rail { opacity: 1; }
+
+/* caret — 6x6 rotated square on the first preview line's centre (y = 20px) */
+.mc-caret {
+  position: absolute;
+  left: 5px; top: 17px;
+  width: 6px; height: 6px;
+  border-right: 2px solid var(--mc-accent);
+  border-top: 2px solid var(--mc-accent);
+  transform: rotate(45deg);
+  opacity: 0;
+  transition: opacity var(--mc-t-row) var(--mc-ease);
+}
+.mc-row.is-selected .mc-caret { opacity: 1; }
+
+/* --- text ---------------------------------------------------------------- */
+.mc-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-fs-content);
+  line-height: var(--mc-lh-content);
+  font-weight: 400;
+  color: var(--mc-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 9px;
+}
+/* Weight 500, not 600: at 600 Cascadia Mono's advance grows enough that a row
+   sitting one step from the clamp boundary pushes its second line under the
+   ellipsis.  500 is the heaviest weight that keeps every 13 DIP string in the
+   panel inside its box. */
+.mc-row.is-selected .mc-text { font-weight: 500; }
+
+/* Every line box preserves the payload's spelling — indentation and run-lengths
+   exactly as preview() computed them, and no re-flow: line 2 of a multi-line row
+   must start at the character the payload starts it at, not wherever the browser
+   ran out of room.  The renderer has already clipped each line to the column
+   budget, so `pre` here can never overflow. */
+.mc-text .mc-ln { white-space: pre; }
+
+.mc-text.is-multiline {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+
+.mc-text .mc-blank {
+  font-style: italic;
+  opacity: 0.92;
+}
+.mc-text .mc-badge {
+  font-family: var(--mc-font-ui);
+  font-style: italic;
+  font-size: var(--mc-fs-chrome);
+  font-weight: 400;
+  white-space: pre;
+  color: var(--mc-text-chrome);
+}
+
+/* --- line-count marker: multi-line rows only ----------------------------- */
+.mc-lines {
+  flex: 0 0 var(--mc-right-w);
+  width: var(--mc-right-w);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-fs-chrome);
+  line-height: var(--mc-lh-chrome);
+  color: var(--mc-text-chrome);
+  font-variant-numeric: tabular-nums;
+}
+.mc-lines svg { flex: none; opacity: 0.85; }
+.mc-row.is-selected .mc-lines { color: var(--mc-text); }
+
+/* --- scroller ------------------------------------------------------------ */
+.mc-list.is-scrollable { overflow-y: auto; overscroll-behavior: contain; }
+.mc-list.is-scrollable::-webkit-scrollbar { width: 0; height: 0; }
+.mc-list { scrollbar-width: none; }
+
+/* --- popup footer band: legend / empty line / just-happened -------------- */
+.mc-foot {
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  /* 11 = row gutter (14) − rail overhang (3): the footer's first key sits on the
+     same left rhythm as the row text. */
+  padding: 4px 12px 5px 11px;
+  border-top: 1px solid var(--mc-hairline-soft);
+  font-family: var(--mc-font-ui);
+  font-size: var(--mc-fs-chrome);
+  line-height: var(--mc-lh-chrome);
+  color: var(--mc-text-chrome);
+}
+.mc-foot > * { display: none; }
+.mc-foot[data-foot="hint"] > .mc-foot-hint,
+.mc-foot[data-foot="empty"] > .mc-foot-empty,
+.mc-foot[data-foot="confirm"] > .mc-foot-confirm { display: flex; }
+
+/* Three fixed cells, not a grid: inside a 400 DIP popup the band is 374 DIP wide,
+   so the cells are 72 / 92 / 62 and the leftover 148 is the whitespace between
+   them — a separator character is never needed. */
+.mc-foot-hint {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+}
+.mc-key {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  flex: none;
+}
+.mc-key:nth-child(1) { width: 70px; }
+.mc-key:nth-child(2) { width: 90px; }
+.mc-key:nth-child(3) { width: 60px; }
+.mc-key b {
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-fs-content);
+  font-weight: 400;
+  color: var(--mc-text);
+  flex: none;
+}
+.mc-key span {
+  color: var(--mc-text-chrome);
+  white-space: nowrap;
+}
+
+.mc-foot-empty { flex: 1 1 auto; }
+
+.mc-foot-confirm {
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  animation: mc-confirm calc(var(--mc-t-confirm) * var(--mc-motion)) var(--mc-ease) both;
+}
+.mc-foot-confirm .mc-ok {
+  flex: none;
+  color: var(--mc-accent);
+  font-weight: 600;
+}
+.mc-foot-confirm.is-fail .mc-ok { color: var(--mc-caution); }
+.mc-foot-confirm .mc-echo {
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-fs-content);
+  color: var(--mc-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.mc-foot-confirm .mc-tail { flex: none; }
+
+/* --- empty state --------------------------------------------------------- */
+.mc-empty {
+  padding: 16px var(--mc-gutter-w) 16px calc(var(--mc-gutter-w) + 1px);
+  font-family: var(--mc-font-ui);
+}
+.mc-empty h3 {
+  margin: 0;
+  font-size: var(--mc-fs-content);
+  line-height: var(--mc-lh-content);
+  font-weight: 600;
+  color: var(--mc-text);
+}
+.mc-empty p {
+  margin: 2px 0 0;
+  font-size: var(--mc-fs-chrome);
+  line-height: 18px;
+  color: var(--mc-text-chrome);
+}
+
+/* --- conflict notice (rendered in the popup's own band) ------------------ */
+.mc-notice {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1 1 auto;
+  color: var(--mc-caution);
+  min-width: 0;
+}
+.mc-notice .mc-mark { flex: none; font-weight: 600; }
+.mc-notice .mc-echo {
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-fs-content);
+  color: var(--mc-text);
+  flex: none;
+}
+.mc-notice .mc-tail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================ tray menu === */
+.mc-menu {
+  width: 224px;
+  padding: 4px;
+  background: var(--mc-surface);
+  border-radius: var(--mc-rad-menu);
+  box-shadow: var(--mc-inset), var(--mc-shadow-menu);
+  font-family: var(--mc-font-ui);
+  font-size: var(--mc-fs-chrome);
+  line-height: var(--mc-lh-chrome);
+  color: var(--mc-text);
+  animation: mc-pop calc(var(--mc-t-menu) * var(--mc-motion)) var(--mc-ease) both;
+  animation-delay: var(--mc-delay, 0ms);
+}
+.mc-menu-head {
+  padding: 6px 10px 7px;
+}
+.mc-menu-head .mc-name {
+  display: block;
+  font-weight: 600;
+  color: var(--mc-text);
+}
+.mc-menu-head .mc-status {
+  display: block;
+  margin-top: 1px;
+  color: var(--mc-text-chrome);
+}
+.mc-menu-head .mc-status.is-warn { color: var(--mc-caution); }
+.mc-menu .mc-sep {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--mc-hairline-soft);
+}
+.mc-mi {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  color: var(--mc-text);
+}
+.mc-mi .mc-mi-hint {
+  margin-left: auto;
+  color: var(--mc-text-chrome);
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-fs-chrome);
+}
+.mc-mi.is-hover { background: var(--mc-surface-wash); }
+.mc-mi.is-danger { color: var(--mc-danger); }
+.mc-mi.is-disabled { color: var(--mc-text-chrome); opacity: 0.65; }
+.mc-mi .mc-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; flex: none;
+}
+
+/* ========================================================= hotkey dialog == */
+.mc-dialog {
+  width: 360px;
+  padding: 16px;
+  background: var(--mc-surface);
+  border-radius: var(--mc-rad-dialog);
+  box-shadow: var(--mc-inset), var(--mc-shadow-dialog);
+  font-family: var(--mc-font-ui);
+  font-size: var(--mc-fs-chrome);
+  line-height: var(--mc-lh-chrome);
+  color: var(--mc-text);
+  animation: mc-pop calc(var(--mc-t-menu) * var(--mc-motion)) var(--mc-ease) both;
+  animation-delay: var(--mc-delay, 0ms);
+}
+.mc-dialog h2 {
+  margin: 0;
+  font-size: var(--mc-fs-title);
+  line-height: var(--mc-lh-title);
+  font-weight: 600;
+}
+.mc-dialog .mc-sub {
+  margin: 2px 0 14px;
+  color: var(--mc-text-chrome);
+}
+.mc-field-label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--mc-text-chrome);
+}
+.mc-record {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  background: var(--mc-surface-wash);
+  border: 1px solid var(--mc-hairline);
+  border-radius: var(--mc-rad-key);
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-fs-content);
+  color: var(--mc-text);
+}
+.mc-record.is-recording { border-color: var(--mc-accent); }
+.mc-record.is-conflict  { border-color: var(--mc-caution); }
+.mc-record .mc-record-val { letter-spacing: 0; }
+.mc-record .mc-record-state {
+  margin-left: auto;
+  font-family: var(--mc-font-ui);
+  font-size: var(--mc-fs-chrome);
+  color: var(--mc-text-chrome);
+}
+.mc-record.is-recording .mc-record-state { color: var(--mc-accent); }
+.mc-record.is-conflict  .mc-record-state { color: var(--mc-caution); }
+.mc-record .mc-cursor {
+  display: inline-block;
+  width: 2px; height: 16px;
+  background: var(--mc-accent);
+  vertical-align: -3px;
+}
+.mc-inline-note {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--mc-caution);
+}
+.mc-inline-note.is-ok { color: var(--mc-text-chrome); }
+.mc-inline-note .mc-mark { flex: none; font-family: var(--mc-font-mono); }
+.mc-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--mc-text);
+}
+.mc-box {
+  width: 14px; height: 14px; flex: none;
+  border-radius: 3px;
+  background: var(--mc-surface-wash);
+  box-shadow: inset 0 0 0 1px var(--mc-hairline);
+  position: relative;
+}
+.mc-check.is-on .mc-box { background: var(--mc-accent); box-shadow: none; }
+.mc-check.is-on .mc-box::after {
+  content: "";
+  position: absolute; left: 4px; top: 1px;
+  width: 4px; height: 8px;
+  border-right: 2px solid var(--mc-accent-ink);
+  border-bottom: 2px solid var(--mc-accent-ink);
+  transform: rotate(40deg);
+}
+.mc-check .mc-hint { color: var(--mc-text-chrome); }
+.mc-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.mc-btn {
+  font-family: var(--mc-font-ui);
+  font-size: var(--mc-fs-chrome);
+  line-height: 16px;
+  padding: 7px 14px;
+  border-radius: var(--mc-rad-key);
+  background: var(--mc-surface-wash);
+  color: var(--mc-text);
+  box-shadow: inset 0 0 0 1px var(--mc-hairline-soft);
+}
+.mc-btn.is-primary {
+  background: var(--mc-accent);
+  color: var(--mc-accent-ink);
+  font-weight: 600;
+  box-shadow: none;
+}
+.mc-btn.is-primary.is-blocked { opacity: 0.45; }
+
+/* ------------------------------------------------------------- a11y ------- */
+.mc :focus-visible,
+.mc-btn:focus-visible,
+.mc-record:focus-visible {
+  outline: 2px solid var(--mc-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-popup, .mc-menu, .mc-dialog, .mc-foot-confirm { animation: none !important; }
+  .mc-row, .mc-rail, .mc-caret { transition: none !important; }
+}
+
+/* ======================================================== stage / pages === */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: #CCD2DA;
+  color: #131A23;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+body.mc-stage-dark { background: #1E2733; }
+
+.page-head {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 40px 24px 8px;
+}
+.page-head h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.page-head p {
+  margin: 4px 0 0;
+  max-width: 66ch;
+  font-size: 13px;
+  line-height: 20px;
+  color: #4A5666;
+}
+
+/* --- control strip (prototype only) -------------------------------------- */
+.hud {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 16px 24px 0;
+}
+.hud-inner {
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(19, 26, 35, 0.10), 0 6px 18px -10px rgba(19, 26, 35, 0.30);
+  padding: 12px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.hud-group { display: flex; align-items: center; gap: 6px; }
+.hud-group > .hud-lab {
+  font-size: 12px;
+  color: #4A5666;
+  margin-right: 2px;
+}
+.hud-sep { width: 1px; height: 20px; background: rgba(19, 26, 35, 0.14); margin: 0 4px; }
+.ctl {
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  padding: 6px 11px;
+  border: 0;
+  border-radius: 6px;
+  background: #E4E9EF;
+  color: #131A23;
+  box-shadow: inset 0 0 0 1px rgba(19, 26, 35, 0.10);
+  cursor: pointer;
+}
+.ctl:hover { background: #DCE3EB; }
+.ctl:focus-visible { outline: 2px solid #0F7F6B; outline-offset: 2px; }
+.ctl[aria-pressed="true"] {
+  background: #0F7F6B;
+  color: #fff;
+  box-shadow: none;
+}
+.ctl-strong { background: #131A23; color: #fff; box-shadow: none; }
+.ctl-strong:hover { background: #232D3A; }
+
+.hud-status {
+  margin: 10px auto 0;
+  max-width: 1160px;
+  padding: 0 24px;
+  font-family: "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace;
+  font-size: 12px;
+  line-height: 18px;
+  color: #46525F;
+}
+
+/* --- stage --------------------------------------------------------------- */
+.stage {
+  position: relative;
+  max-width: 1160px;
+  margin: 22px auto 56px;
+  height: 480px;
+  border-radius: 12px;
+  background: #CCD2DA;
+  box-shadow: inset 0 0 0 1px rgba(19, 26, 35, 0.10);
+  overflow: hidden;
+}
+.stage-dark { background: #1E2733; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.stage .fp {
+  position: absolute;
+  left: 96px;
+  top: 46px;
+  width: 480px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 1px rgba(19, 26, 35, 0.12), 0 4px 14px -6px rgba(19, 26, 35, 0.24);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 13px;
+  line-height: 20px;
+  color: #131A23;
+}
+.stage-dark .fp {
+  background: #1B232E;
+  color: #E7EDF4;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
+}
+.stage .fp .fp-lab {
+  display: block;
+  margin-bottom: 4px;
+  font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  font-size: 11px;
+  color: #7A8798;
+  letter-spacing: 0;
+}
+.stage .fp .caret {
+  display: inline-block;
+  width: 1px; height: 15px;
+  background: currentColor;
+  vertical-align: -3px;
+  animation: blink 1.1s steps(1, end) infinite;
+}
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+.stage .slot {
+  position: absolute;
+  left: 236px;
+  top: 152px;
+}
+.stage-note {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  color: #6C7889;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage .fp .caret { animation: none; }
+}
+
+/* --- contact sheet ------------------------------------------------------- */
+.sheet {
+  /* 440 = the popup's 400 plus the tile's own 20 DIP padding on each side: a
+     column can never be squeezed narrower than the popup it has to hold. */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+  gap: 24px;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 24px;
+  align-items: start;
+}
+.tile { min-width: 0; }
+.tile > figcaption { margin: 0 0 6px; }
+.tile .t-name {
+  display: block;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 16px;
+  color: #131A23;
+}
+.tile .t-desc {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  line-height: 16px;
+  color: #55616F;
+}
+.tile-body {
+  padding: 20px;
+  border-radius: 8px;
+  background: #E3E8EE;
+  box-shadow: inset 0 0 0 1px rgba(19, 26, 35, 0.09);
+  min-height: 374px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.tile-body.is-dark { background: #1E2733; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); }
+.tile-body.is-center { align-items: center; }
+.tile-body.is-clip { overflow: hidden; }
+figure { margin: 0; }

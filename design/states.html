@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiniClip — 状态接触表</title>
+<link rel="stylesheet" href="miniclip.css">
+<style>
+  /* contact-sheet-only.  The sheet's `auto-fit minmax(440px, 1fr)` grid means a
+     column can never be narrower than the 400 DIP popup plus the tile's padding,
+     so no tile can ever clip the thing it is meant to show. */
+  body.solo .page-head { display: none; }
+  /* a single-state capture should not inherit the sheet's row alignment */
+  body.solo .tile-body { min-height: 0; }
+</style>
+</head>
+<body>
+
+<header class="page-head">
+  <h1>MiniClip — 状态接触表</h1>
+  <p>一张截图看完候选框、托盘菜单与快捷键设置的全部状态。所有控件与 index.html 共用 miniclip.css 的同一套 token，尺寸均为 DIP（= WPF 设备无关像素）。</p>
+</header>
+
+<main class="sheet" id="sheet"></main>
+
+<script src="miniclip.js"></script>
+<script>
+(function () {
+  'use strict';
+  var q = new URLSearchParams(location.search);
+  var theme = q.get('theme') === 'light' ? 'light' : 'dark';
+  var only = q.get('only') || '';           /* render a single tile, no chrome */
+  var rows = 6;
+  var short = MC.historyShort();
+  var full = MC.historyFull();
+
+  function tile(name, desc, html, opts) {
+    opts = opts || {};
+    var dark = (opts.theme || theme) === 'dark';
+    var body = '<div class="tile-body' + (dark ? ' is-dark' : '') +
+      (opts.center ? ' is-center' : '') + (opts.clip ? ' is-clip' : '') + '">' + html + '</div>';
+    return '<figure class="tile" id="t-' + name + '">' +
+      '<figcaption><span class="t-name">' + name + '</span>' +
+      '<span class="t-desc">' + desc + '</span></figcaption>' +
+      (dark ? '<div class="mc" data-theme="dark">' + body + '</div>'
+            : '<div class="mc" data-theme="light">' + body + '</div>') +
+      '</figure>';
+  }
+
+  /* The 30-entry tile is scrolled to a middle entry, the way it looks after
+     eleven ↑ presses: newest has scrolled off, both ends are still reachable. */
+  function scrolledList() {
+    return MC.popupHtml({ items: full, selected: 18, rows: rows, foot: 'hint' });
+  }
+
+  var tiles = [
+    ['default', tile('default', '默认：6 行可见，最新一条在首位并被选中。', 
+      MC.popupHtml({ items: short, selected: 0, rows: rows }))],
+    ['selection-middle', tile('selection-middle', '选中第 4 行：导轨、插入符、底色、字重四处同时变化。', 
+      MC.popupHtml({ items: short, selected: 3, rows: rows }))],
+    ['empty', tile('empty', '空历史：候选框照常打开，说明发生了什么、下一步做什么。', 
+      MC.popupHtml({ items: [], foot: 'empty' }))],
+    ['list-30', tile('list-30', '30 条上限，滚动到第 19 条：导轨落在第 4 行，行号与时间都不需要。',
+      scrolledList(), { clip: true })],
+    ['multiline', tile('multiline', '多行条目被选中：第二行截断，右侧 ↕ 给出真实行数 4。', 
+      MC.popupHtml({ items: short, selected: 5, rows: rows }))],
+    ['long-line', tile('long-line', '超长单行（URL）：字符级省略号截断，第二行位置让给下一条。', 
+      MC.popupHtml({ items: short, selected: 6, rows: rows }))],
+    ['hotkey-conflict', tile('hotkey-conflict', '快捷键注册失败：候选框底部换成警示带，不假装可用。', 
+      MC.popupHtml({ items: short, selected: 0, rows: rows, foot: 'conflict', hotkey: 'Alt+V',
+        msg: '被其他程序占用，请在托盘中更换' }))],
+    ['dialog', tile('dialog', '快捷键设置；冲突态给出原因，主按钮同时失效，不留假成功。', 
+      MC.dialogHtml({ state: 'conflict', hotkey: 'Alt+V', autostart: true }), { center: true })],
+    ['tray-menu', tile('tray-menu', '托盘菜单；注册失败时在标题下直接显示失败原因。', 
+      MC.menuHtml({ conflict: true, hotkey: 'Alt+V', hasHistory: true }), { center: true })]
+  ];
+
+  var sheet = document.getElementById('sheet');
+  if (only) {
+    document.body.classList.add('solo');
+    var want = only.split(',');
+    sheet.innerHTML = tiles.filter(function (t) { return want.indexOf(t[0]) !== -1; })
+      .map(function (t) { return t[1]; }).join('');
+    sheet.style.setProperty('--cols', '1');
+    sheet.style.maxWidth = '520px';
+    sheet.style.padding = '20px';
+  } else {
+    sheet.innerHTML = tiles.map(function (t) { return t[1]; }).join('');
+  }
+
+  /* scroll the 30-entry tile to the selected row */
+  var sc = document.querySelector('#t-list-30 .mc-list.is-scrollable');
+  if (sc) {
+    var sel = sc.querySelector('.mc-row.is-selected');
+    sc.scrollTop = sel.offsetTop - MC.PAD - 3 * MC.ROW_H;
+  }
+})();
+</script>
+</body>
+</html>
