@@ -1,0 +1,41 @@
+# MiniClip — 换行符与二进制文件处理
+#
+# 没有这个文件时，git 在 Windows 上会警告 “LF will be replaced by CRLF”，
+# 并且不同平台克隆出来的工作区换行符不一致，造成满屏无意义的 diff。
+
+# 默认策略：由 git 检测文本文件，仓库里统一存 LF，检出时也用 LF。
+# 这样 Windows / macOS / Linux 上克隆得到的文件一模一样。
+* text=auto eol=lf
+
+# 明确指定为文本的类型，避免被误判成二进制
+*.cs        text
+*.xaml      text
+*.csproj    text
+*.manifest  text
+*.iss       text
+*.ps1       text
+*.py        text
+*.md        text
+*.json      text
+*.html      text
+*.css       text
+*.js        text
+*.svg       text
+*.gitignore text
+
+# 二进制：不做任何换行符转换。少了这一段，git 可能尝试“规范化”它们从而损坏文件。
+*.png   binary
+*.ico   binary
+*.exe   binary
+*.dll   binary
+*.pdb   binary
+*.zip   binary
+*.woff  binary
+*.woff2 binary
+
+# GitHub 语言统计：设计原型（HTML/CSS/JS）不参与统计，
+# 否则一个 C# 项目的语言构成会被设计稿盖过去。
+design/** linguist-documentation
+
+# 生成的文件不参与 diff 展示，避免噪音
+docs/VERIFICATION*.md linguist-detectable=false
