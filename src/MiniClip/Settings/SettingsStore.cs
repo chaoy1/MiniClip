@@ -24,8 +24,9 @@ public sealed class SettingsStore
     }
 
     /// <summary>
-    /// The directory settings live in: the install directory in portable mode,
-    /// <c>%LOCALAPPDATA%\MiniClip</c> otherwise. See <see cref="AppPaths"/>.
+    /// The directory settings live in: the application directory by default,
+    /// <c>%LOCALAPPDATA%\MiniClip</c> only when that is not writable.
+    /// See <see cref="AppPaths"/>.
     /// </summary>
     public static string DefaultDirectory => AppPaths.DataDirectory;
 

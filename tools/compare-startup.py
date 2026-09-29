@@ -28,6 +28,26 @@ VARIANTS = {
 
 RUNS = 7
 
+def _data_dir_for(exe: Path) -> Path:
+    """返回该可执行文件实际使用的数据目录。
+
+    与 src/MiniClip/Settings/AppPaths.cs 的规则一致：
+      1. 程序目录可写 -> <程序目录>/data
+      2. 否则        -> %LOCALAPPDATA%/MiniClip
+    这里按"哪个目录里已经有日志"来判断，因为测量脚本是在事后读日志。
+    """
+    candidates = [exe.parent / "data", Path.home() / "AppData" / "Local" / "MiniClip"]
+    existing = [c for c in candidates if c.is_dir() and any(c.glob("miniclip-*.log"))]
+    if existing:
+        return max(existing, key=lambda c: max(f.stat().st_mtime for f in c.glob("miniclip-*.log")))
+    return candidates[0]
+
+
+def logs_for(exe: Path) -> list[Path]:
+    """该可执行文件最近一次运行写下的日志，按时间倒序。"""
+    data_dir = _data_dir_for(exe)
+    return sorted(data_dir.glob("miniclip-*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+
 
 class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
     _fields_ = [
@@ -46,7 +66,7 @@ class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
 
 def sample_once(exe: Path, run_seconds: int = 4) -> tuple[float, float | None]:
     """Returns (peak working set MB, startup ms)."""
-    for f in LOCALAPPDATA.glob("miniclip-*.log"):
+    for f in list((exe.parent / "data").glob("miniclip-*.log")) + list(LOCALAPPDATA.glob("miniclip-*.log")):
         f.unlink(missing_ok=True)
 
     created = datetime.now()
@@ -75,7 +95,7 @@ def sample_once(exe: Path, run_seconds: int = 4) -> tuple[float, float | None]:
     proc.wait(timeout=40)
 
     startup_ms = None
-    logs = sorted(LOCALAPPDATA.glob("miniclip-*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+    logs = logs_for(exe)
     if logs:
         first = logs[0].read_text(encoding="utf-8", errors="replace").splitlines()
         if first:

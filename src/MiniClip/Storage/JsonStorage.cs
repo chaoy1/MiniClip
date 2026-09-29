@@ -130,13 +130,13 @@ public sealed class JsonStorage
 
     /// <summary>
     /// Gets the default history file location: <c>&lt;data&gt;\history.json</c>, where
-    /// <c>&lt;data&gt;</c> is the install directory in portable mode and
-    /// <c>%LOCALAPPDATA%\MiniClip</c> otherwise. See <see cref="AppPaths"/>.
+    /// <c>&lt;data&gt;</c> is the application directory by default and
+    /// <c>%LOCALAPPDATA%\MiniClip</c> only when that is not writable. See <see cref="AppPaths"/>.
     /// </summary>
     /// <remarks>
-    /// Deliberately a property rather than a cached field: the answer depends on a marker
-    /// file and on whether the install directory is writable, both of which the self-test
-    /// changes at runtime. Caching it here would make the app report a stale location.
+    /// Deliberately a property rather than a cached field: the answer depends on whether the
+    /// application directory accepts writes, which the self-test changes at runtime. Caching
+    /// it here would make the app report a stale location.
     /// </remarks>
     public static string DefaultHistoryPath => Path.Combine(AppPaths.DataDirectory, "history.json");
 

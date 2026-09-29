@@ -190,7 +190,7 @@ lifecycle  ProcessExit
 
 ## 安装包
 
-安装包使用自包含 `win-x64` 发布：运行所需的 .NET 10 Desktop Runtime 已随程序打包。构建脚本发布的是 **269 个文件、约 155.7 MB** 的自包含目录，再由 Inno Setup 以 `lzma2/ultra64` 压缩；当前产物 `dist\MiniClip-Setup-1.0.0-x64.exe` 为 **48.8 MB**（51,203,024 字节）。构建需要 .NET 10 SDK 和 Inno Setup 7；后者的 `ISCC.exe` 可通过参数指定：
+安装包使用自包含 `win-x64` 发布：运行所需的 .NET 10 Desktop Runtime 已随程序打包。构建脚本发布的是 **269 个文件、约 155.7 MB** 的自包含目录，再由 Inno Setup 以 `lzma2/ultra64` 压缩；当前产物 `dist\MiniClip-Setup-1.0.0-x64.exe` 为 **48.81 MB**（51,185,721 字节；上一版构建是 51,203,024 字节，重新构建后体积有变化，以磁盘上的实际文件为准）。构建需要 .NET 10 SDK 和 Inno Setup 7；后者的 `ISCC.exe` 可通过参数指定：
 
 ```powershell
 & .\tools\build-installer.ps1 `
@@ -200,34 +200,42 @@ lifecycle  ProcessExit
 
 输出位于 `dist\MiniClip-Setup-1.0.0-x64.exe`。构建脚本会按项目版本命名安装包，并打印 SHA-256；版本号是用显式 UTF-8 读取从 `.csproj` 里取的，原因见 [VERIFICATION.md](VERIFICATION.md) 的“不能回退的构建配置结论”。
 
-安装向导始终显示目录选择页（`DisableDirPage=no`），默认安装到当前用户的 `%LOCALAPPDATA%\Programs\MiniClip`——这个位置用户可写，“数据跟着安装目录走”才成立；也可以改成任意有写入权限的位置，不要求管理员权限。安装任务有两项，**默认都不勾选**：
+安装向导始终显示目录选择页（`DisableDirPage=no`），默认安装到当前用户的 `%LOCALAPPDATA%\Programs\MiniClip`——这个位置用户可写，数据因此落在安装目录下的 `data\` 里（“数据在程序旁边”靠的是程序目录可写，而不是标记文件）；也可以改成任意有写入权限的位置，不要求管理员权限。装到没有写权限的位置时程序会回退到 `%LOCALAPPDATA%\MiniClip\` 并在托盘说明。安装任务有两项，**默认都不勾选**：
 
 | 任务 | 内容 | 默认状态 |
 | --- | --- | --- |
 | `autostart` | 开机自动启动 MiniClip（写 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 的 `MiniClip` 值） | 不勾选；若该值已经存在，向导会自动勾上以反映当前实际状态 |
 | `desktopicon` | 创建桌面快捷方式 | 不勾选 |
 
-安装时会在安装目录写入标记文件 `MiniClip.portable`，它决定数据放在哪里，见下一节。安装完成页可选择立即运行。安装或卸载前若 MiniClip 正在运行，向导会提示先退出；即使没退出，安装/卸载过程也会**按可执行文件的完整路径**结束本安装目录下的那个实例——刻意不用按映像名结束，否则会把从别处运行的绿色版或另一个安装目录的实例一起杀掉。
+安装时会在安装目录写入标记文件 `MiniClip.portable`。**它不再决定数据放在哪里**——程序目录可写时数据一律放在程序目录下的 `data\`，标记只授权把旧的 `%LOCALAPPDATA%\MiniClip` 数据导入进来，见下一节。安装完成页可选择立即运行。安装或卸载前若 MiniClip 正在运行，向导会提示先退出；即使没退出，安装/卸载过程也会**按可执行文件的完整路径**结束本安装目录下的那个实例——刻意不用按映像名结束，否则会把从别处运行的绿色版或另一个安装目录的实例一起杀掉。
 
 无界面安装可使用 Inno Setup 的 `/VERYSILENT /DIR="<目录>" /TASKS="autostart,desktopicon"`；不传 `/TASKS` 时两项都不执行，也就是首次安装默认不开机启动、不建桌面快捷方式。更换安装目录时请先卸载旧安装，避免旧目录留下未被新安装器管理的文件。安装包为当前用户安装，不包含代码签名证书。
 
 ### `MiniClip.portable` 标记文件
 
-这个空标记文件是数据位置的开关。它来自 [installer/portable-marker.flag](../installer/portable-marker.flag)，由 `installer/MiniClip.iss` 的 `[Files]` 条目复制到安装目录并改名为 `MiniClip.portable`：
+这个空标记文件来自 [installer/portable-marker.flag](../installer/portable-marker.flag)，由 `installer/MiniClip.iss` 的 `[Files]` 条目复制到安装目录并改名为 `MiniClip.portable`。
 
-- **标记存在，且安装目录可写**：[src/MiniClip/Settings/AppPaths.cs](../src/MiniClip/Settings/AppPaths.cs) 判定为便携布局，`history.json`、`settings.json` 和诊断日志都写进 `<安装目录>\data\`。这是安装包的默认形态，也是“卸载不留痕迹”成立的前提。
-- **删掉标记**：程序下次启动时找不到它，就回到 `%LOCALAPPDATA%\MiniClip\`。注意这不会搬走已有数据——原来 `data\` 里的历史仍留在安装目录，新写入的换到用户数据目录。
-- **标记存在但安装目录不可写**（普通用户装进 `C:\Program Files` 就是这种情况）：程序回退到 `%LOCALAPPDATA%\MiniClip\`，并在托盘提示「安装目录不可写，历史已改存到用户数据目录」，而不是静默丢掉历史。“可写”是用真实的创建/写入/删除探针测出来的，不是看目录是否存在——目录存在却拒绝写入正是最常见的失败形态。
+**这一节改写自旧的语义，旧说法已经作废。** 以前“可执行文件旁边有标记”才是便携布局的开关，没有标记就写 `%LOCALAPPDATA%\MiniClip\`，绿色发布包和从 `bin\` 直接运行的构建都属于那一类。现在 [src/MiniClip/Settings/AppPaths.cs](../src/MiniClip/Settings/AppPaths.cs) 的规则是：**程序目录可写就是便携布局，与标记无关**；标记的作用缩小为一件事——授权把旧的 `%LOCALAPPDATA%\MiniClip` 数据导入进来。逐条说：
+
+- **程序目录可写（默认，与标记无关）**：`history.json`、`settings.json` 和诊断日志都写进 `<程序目录>\data\`。安装包安装的版本和解压即用的绿色发布包都是这一档，这也是“卸载不留痕迹”成立的前提。
+- **有标记，且程序目录可写**：数据目录同上，另外执行一次**导入**——把 `%LOCALAPPDATA%\MiniClip\` 里已有的旧数据复制进 `data\`。只复制 `history.json` 和 `settings.json` 两个文件，是**复制不是移动**，并且只在 `data\history.json` 还不存在时执行，所以既不会删掉原文件，也永远不会覆盖这个副本自己的数据（第二次导入复制 0 个文件）。导入成功后托盘提示「已把原有历史导入到程序目录」。
+- **从 `bin\` 直接运行的开发构建不导入**：它同样会得到自己的 `data\`（例如 `src\MiniClip\bin\Release\net10.0-windows\data\`），但旁边没有安装包写入的标记，因此不会把正式安装的历史拿过来。这条区分正是标记仍然存在的主要理由。
+- **删掉标记**：数据位置不变（仍然是 `<程序目录>\data\`，这一点和旧行为不同），只是下次启动不再做导入；`data\` 里已有的内容不受影响。
+- **程序目录不可写**（普通用户装进 `C:\Program Files` 就是这种情况）：程序回退到 `%LOCALAPPDATA%\MiniClip\`，并在托盘提示「安装目录不可写，历史已改存到用户数据目录」，而不是静默丢掉历史。“可写”是用真实的创建/写入/删除探针测出来的，不是看目录是否存在——目录存在却拒绝写入正是最常见的失败形态。
+
+入口是 [src/MiniClip/MiniClipController.cs](../src/MiniClip/MiniClipController.cs) 的 `StartAsync`：它在任何代码读取历史或设置之前先调用 `AppPaths.EnsureDataDirectory()`，负责创建数据目录，并在允许时执行那一次导入。
 
 ## 卸载与数据
 
-数据写在哪里由可执行文件旁边有没有 `MiniClip.portable` 决定，启动时解析一次（[src/MiniClip/Settings/AppPaths.cs](../src/MiniClip/Settings/AppPaths.cs)）。三种情况：
+数据写在哪里由**程序目录是否可写**决定，启动时解析一次（[src/MiniClip/Settings/AppPaths.cs](../src/MiniClip/Settings/AppPaths.cs)）。`DataLocationMode` 现在只有两个取值：`Portable` 和 `LocalAppDataFellBack`。旧文档里的 `LocalAppData` **已经不存在了**——程序目录可写时不再有“写用户数据目录”这一档，绿色发布包和从 `bin\` 直接运行的构建也走 `Portable`。三种情况：
 
 | 情况 | 数据目录 | `AppPaths.Mode` |
 | --- | --- | --- |
-| 通过安装包安装（有标记，且安装目录可写） | `<安装目录>\data\` | `Portable` |
-| 绿色发布包，或从 `bin\` 直接运行（没有标记） | `%LOCALAPPDATA%\MiniClip\` | `LocalAppData` |
-| 有标记但安装目录不可写 | 回退到 `%LOCALAPPDATA%\MiniClip\`，托盘提示「安装目录不可写，历史已改存到用户数据目录」 | `LocalAppDataFellBack` |
+| 程序目录可写（默认，安装包安装和绿色发布包都在这一档） | `<程序目录>\data\` | `Portable` |
+| 程序目录可写，且旁边有 `MiniClip.portable` 标记 | `<程序目录>\data\`，并把已有的 `%LOCALAPPDATA%\MiniClip\` 数据一次性导入（`MayImportLegacyData=true`） | `Portable` |
+| 程序目录不可写（普通用户装进 `C:\Program Files` 就是这种情况） | 回退到 `%LOCALAPPDATA%\MiniClip\`，托盘提示「安装目录不可写，历史已改存到用户数据目录」 | `LocalAppDataFellBack` |
+
+标记不再参与第一、三两行的判定，只有第二行的导入需要它：有标记的副本才被允许把旧的 `%LOCALAPPDATA%\MiniClip` 数据复制进 `data\`。
 
 三个写入者都走这同一个入口：[src/MiniClip/Storage/JsonStorage.cs](../src/MiniClip/Storage/JsonStorage.cs)（`DefaultHistoryPath` 是每次重新求值的属性，不是启动时缓存的字段）、[src/MiniClip/Settings/SettingsStore.cs](../src/MiniClip/Settings/SettingsStore.cs) 和 [src/MiniClip/Diagnostics/DiagnosticsLog.cs](../src/MiniClip/Diagnostics/DiagnosticsLog.cs)；诊断日志和数据放在同一个目录。两种布局下目录里的文件相同：
 
@@ -248,7 +256,7 @@ lifecycle  ProcessExit
 
 `CurUninstallStepChanged` 在 `usPostUninstall` 里还会再取一次 `{app}\data` 并 `DelTree`：用户可以装到任意位置，只靠 `[UninstallDelete]` 里的常量路径不够稳。卸载将永久删除上述历史、设置、日志及损坏文件备份；需要保留的内容应在卸载前自行备份。安装目录里的其他文件不会被删——`[UninstallDelete]` 只列了上面三个路径，安装文件被移除、`data\` 被删除之后目录清空并随之移除；如果用户往安装目录里放了别的东西，目录会保留。Windows 自己维护的预取、最近使用等系统缓存不属于 MiniClip 数据。删除文件不等于安全擦除磁盘数据。
 
-直接使用绿色发布包的版本没有卸载器：删掉发布文件只删掉程序，`%LOCALAPPDATA%\MiniClip\` 里的历史、设置、日志以及 `HKCU\...\Run` 的开机启动值都还在，需要手动清理。托盘的“清空历史”只删 `history.json`，不删 `settings.json` 和诊断日志。
+直接使用绿色发布包的版本没有卸载器。**数据默认就在发布目录的 `data\` 里，所以删掉发布文件夹会连历史、设置和日志一起删掉**——这是本轮行为变化带来的直接结果：以前绿色版的数据在 `%LOCALAPPDATA%\MiniClip\`，删程序删不掉数据，必须手动清理；现在只有“程序目录不可写、数据回退到用户数据目录”的那种副本才需要手动删 `%LOCALAPPDATA%\MiniClip\`（托盘会提示「安装目录不可写，历史已改存到用户数据目录」）。两种情况下 `HKCU\...\Run` 的开机启动值都还在，要在设置里关掉或手动删除。托盘的“清空历史”只删 `history.json`，不删 `settings.json` 和诊断日志。
 
 ## 开机启动
 

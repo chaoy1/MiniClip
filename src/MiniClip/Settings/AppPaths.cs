@@ -6,28 +6,32 @@ namespace MiniClip.Settings;
 /// Where MiniClip keeps its own files.
 /// </summary>
 /// <remarks>
-/// <para>Two layouts are supported, and which one applies is decided once at startup:</para>
-/// <list type="bullet">
-/// <item><b>Portable</b> — a <c>MiniClip.portable</c> marker file sits next to the
-/// executable, and the data lives in that same directory (<c>data\</c>). This is what the
-/// installer sets up, so a user-chosen install folder also holds the history, settings and
-/// logs, and uninstalling can genuinely remove everything.</item>
-/// <item><b>Roaming-install</b> — no marker, so the data goes to
-/// <c>%LOCALAPPDATA%\MiniClip</c>. This is what the project plan specifies (§12) and what
-/// a build run straight from <c>bin\</c> uses.</item>
-/// </list>
-/// <para>The permission rule is not optional and is the reason for the writability probe:
-/// a process running as a normal user cannot write into <c>C:\Program Files</c> or anywhere
-/// else under a machine-wide ACL. If the install directory is not writable, silently
-/// failing to save the history would be the worst possible outcome for a clipboard tool, so
-/// the app falls back to <c>%LOCALAPPDATA%</c> and says so rather than pretending.</para>
+/// <para><b>Data lives beside the executable by default</b>, in a <c>data\</c> folder next to
+/// <c>MiniClip.exe</c>. That applies to every layout — the installer's copy and the
+/// unpacked portable package alike — so an uninstalled copy leaves nothing behind anywhere
+/// else. The project plan's §12 specified <c>%LOCALAPPDATA%\MiniClip</c>; the product
+/// deliberately moved away from that so that "uninstall removes every trace" is literally
+/// true instead of merely claimed.</para>
+/// <para><b>%LOCALAPPDATA%\MiniClip</b> is used only when the executable's folder refuses
+/// writes. That is not hypothetical: a non-elevated process cannot write into
+/// <c>C:\Program Files</c> or anywhere under a machine-wide ACL, so a user who moves the
+/// install there must still get a working clipboard tool. The app falls back and says why
+/// rather than failing to save the history.</para>
+/// <para>The <c>MiniClip.portable</c> marker does <b>not</b> choose the location — it only
+/// authorises a one-time <b>import</b> of data already sitting in <c>%LOCALAPPDATA%</c>,
+/// which is what an upgrade from an older version needs. The installer writes it; a build
+/// run from <c>bin\</c> has no marker and therefore never helps itself to a real
+/// installation's history. See <see cref="TryImportLegacyData"/>.</para>
 /// </remarks>
 public static class AppPaths
 {
-    /// <summary>Marker file name that selects portable mode. Created by the installer.</summary>
+    /// <summary>
+    /// Marker file that authorises the one-time import of legacy <c>%LOCALAPPDATA%</c> data.
+    /// It does not select the data location. Created by the installer.
+    /// </summary>
     public const string PortableMarkerName = "MiniClip.portable";
 
-    /// <summary>Subdirectory of the application folder that holds the data in portable mode.</summary>
+    /// <summary>Subdirectory of the application folder that holds the data.</summary>
     public const string DataFolderName = "data";
 
     private static readonly object Gate = new();

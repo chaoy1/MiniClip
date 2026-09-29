@@ -33,6 +33,17 @@ publish/
 artifacts/
 ```
 
+## 运行时数据目录
+
+MiniClip 把历史、设置和日志放在可执行文件旁边的 `data\`。从 `bin\` 直接跑一次构建，
+就会在 bin 里留下一个 `data\`（那是本机运行痕迹，不是源码）。安装目录下的那份同理，
+不应入库。
+
+```
+data/
+release/*/data/
+```
+
 ## 本地临时目录
 
 `tools/shoot-design.py` 用的独立 Chrome profile（设计截图）。几 MB，删掉会在下次运行时重建。
@@ -44,6 +55,8 @@ artifacts/
 ## 编辑器与系统
 
 ```
+__pycache__/
+*.pyc
 .vs/
 .vscode/
 *.user

@@ -1,4 +1,13 @@
-MiniClip portable-data marker.
-Do not delete: this file tells MiniClip to keep history, settings and logs in the
-"data" folder beside the executable instead of %LOCALAPPDATA%. Removing it makes the
-app fall back to %LOCALAPPDATA%\MiniClip.
+MiniClip import authorisation marker.
+
+You do NOT need this file for MiniClip to keep its data next to the program — that is the
+default: history, settings and logs go into the "data" folder beside MiniClip.exe.
+
+This file does exactly one thing: it allows this copy to ADOPT data that already exists in
+%LOCALAPPDATA%\MiniClip (history.json and settings.json), by copying it into "data" on the
+next start. That is for people upgrading from an older version whose history still lives in
+the user data directory.
+
+It is a copy, never a move, and it never overwrites a history that "data" already holds.
+
+Deleting this file stops the import from happening. It does not change where the data goes.

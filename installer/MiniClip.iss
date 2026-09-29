@@ -15,8 +15,10 @@ AppVersion={#AppVersion}
 AppVerName=MiniClip {#AppVersion}
 AppPublisher=MiniClip
 AppMutex=Local\MiniClip.SingleInstance.v1
-; 默认装到用户自己的目录：不需要管理员权限，而且该目录用户可写，
-; 这样“数据跟着安装目录走”才成立（见 [Files] 里写入的 MiniClip.portable）。
+; 默认装到用户自己的目录：不需要管理员权限，而且该目录用户可写。
+; 这一点是必须的——数据要落在程序目录下的 data\，就需要写权限；装到
+; C:\Program Files 这类受保护目录时普通用户写不进去，程序会回退到
+; %LOCALAPPDATA%\MiniClip 并给出托盘提示（见 src 里的 AppPaths）。
 DefaultDirName={localappdata}\Programs\MiniClip
 DefaultGroupName=MiniClip
 DisableDirPage=no
@@ -55,9 +57,16 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; 【关键】这个空标记文件告诉 MiniClip：数据和程序放在一起。
-; 程序启动时会检查它是否存在，并把 history.json / settings.json / 日志写进 {app}\data\。
-; 卸载时整个 {app} 被删除，数据也就随之消失——这正是“不留痕迹”的实现方式。
+; 这个标记文件的作用是**授权导入**，不再是「数据放哪」的开关。
+;
+; 无论有没有它，只要程序目录可写，数据都放在程序目录下的 data\ 里。它的存在只是允许
+; 本次启动把 %LOCALAPPDATA%\MiniClip 里可能残留的旧版数据一次性复制过来，以照顾从旧
+; 版本升级的用户——他们的历史还在那里。
+;
+; 这个区分是必要的：从 bin\ 直接跑的构建也会有自己的 data\，但绝不能顺手把正式安装的
+; 历史拿走，所以只有安装包写入的标记才授权导入。
+;
+; 导入是复制而非移动，且只在 data\history.json 不存在时执行，因此不会覆盖已有数据。
 Source: "portable-marker.flag"; DestName: "MiniClip.portable"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
@@ -72,10 +81,11 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Filename: "{app}\MiniClip.exe"; Description: "立即运行 MiniClip"; Flags: postinstall nowait skipifsilent
 
 [UninstallDelete]
-; 程序目录下的数据（便携模式），以及卸载程序自己留下的残渣。
+; 程序目录下的数据目录，以及标记文件本身。
 Type: filesandordirs; Name: "{app}\data"
 Type: files; Name: "{app}\MiniClip.portable"
-; 旧版本（或用户手工拷贝的绿色版）可能把数据放在用户数据目录，一并清理，否则“删除所有痕迹”不成立。
+; 程序目录不可写时会回退到用户数据目录（装进 Program Files 的典型情况），
+; 那份数据也要清掉，否则“删除所有痕迹”不成立。
 Type: filesandordirs; Name: "{localappdata}\MiniClip"
 
 [Code]

@@ -520,15 +520,15 @@ public static class SelfTest
     }
 
     /// <summary>
-    /// Verifies where MiniClip puts its data, and that the portable decision is honest.
+    /// Verifies where MiniClip puts its data, and that the decision is honest.
     /// </summary>
     /// <remarks>
     /// This is the difference between "uninstall removes every trace" and "uninstall leaves
-    /// the clipboard history behind". The installer creates a marker file next to the
-    /// executable so the data lives in the chosen install folder; without the marker the app
-    /// must still work, falling back to %LOCALAPPDATA%. Both branches are exercised against
-    /// a throwaway directory so the check does not depend on how this particular build was
-    /// laid out on disk.
+    /// the clipboard history behind". Data belongs beside the executable — that is the
+    /// default for every layout, marker or not — and only a folder that refuses writes may
+    /// push it to %LOCALAPPDATA%. All branches run against throwaway directories so the
+    /// check never touches real data and does not depend on how this build was laid out.
+    /// The marker's separate job, authorising the legacy import, is covered here too.
     /// </remarks>
     private static int CheckDataLocation()
     {

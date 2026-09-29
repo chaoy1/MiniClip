@@ -97,7 +97,10 @@ public static class DiagnosticsLog
     /// <summary>True when a log has been started.</summary>
     public static bool IsEnabled => _path is not null;
 
-    /// <summary>Where logs go: the install directory in portable mode, AppData otherwise.</summary>
+    /// <summary>
+    /// Where logs go: the application directory by default, <c>%LOCALAPPDATA%\MiniClip</c>
+    /// only when that directory is not writable. See <see cref="AppPaths"/>.
+    /// </summary>
     public static string DefaultDirectory => AppPaths.DataDirectory;
 
     /// <summary>Starts writing to <paramref name="path"/>, or to the default log file.</summary>
