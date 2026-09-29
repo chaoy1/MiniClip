@@ -1,7 +1,7 @@
-"""Generate the MiniClip icons from the approved letter-M design.
+"""Generate the MiniClip application and tray icons.
 
-Source geometry: design/icon-concepts/02-letter-m.svg (128 by 128 units).
-Run from the repository root: python tools/make-icons.py
+Requires Pillow. Run from the repository root: python tools/make-icons.py
+The geometry below is shared with TrayIconFactory.cs.
 """
 
 from pathlib import Path
@@ -56,24 +56,6 @@ def main() -> None:
 
     write_ico(assets / "miniclip.ico", [16, 20, 24, 32, 48, 64, 128, 256])
     write_ico(assets / "miniclip-tray.ico", [16, 20, 24, 32, 48])
-
-    shot = root / "design" / "shots"
-    shot.mkdir(parents=True, exist_ok=True)
-    draw_mark(256).save(shot / "icon-256.png")
-
-    sizes = (16, 24, 32, 64, 128)
-    padding = 16
-    preview = Image.new(
-        "RGBA",
-        (sum(sizes) + padding * (len(sizes) + 1), 128 + padding * 2),
-        (0xEC, 0xEC, 0xEC, 0xFF),
-    )
-    x = padding
-    for size in sizes:
-        preview.alpha_composite(draw_mark(size), (x, padding))
-        x += size + padding
-    preview.save(shot / "icon-sizes.png")
-    print(f"wrote {shot / 'icon-256.png'} and {shot / 'icon-sizes.png'}")
 
 
 if __name__ == "__main__":

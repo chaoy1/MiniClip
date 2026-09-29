@@ -28,7 +28,7 @@ public static class TrayIconFactory
         graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
         graphics.Clear(Color.Transparent);
 
-        // Keep the runtime tray mark aligned with design/icon-concepts/02-letter-m.svg.
+        // Keep the runtime tray mark aligned with tools/make-icons.py.
         var unit = pixels / 128f;
         using (var tile = RoundedRect(0, 0, pixels, pixels, 27 * unit))
         using (var tileBrush = new SolidBrush(Color.FromArgb(0x20, 0x20, 0x20)))

@@ -5,8 +5,8 @@
     <!--
         MiniClip design tokens.
 
-        Legacy chrome tokens for the hotkey settings dialog and icon. The popup now has
-        its own two neutral palettes in PopupThemePalette.cs; see design/MINIMAL-THEMES.md.
+        Legacy chrome tokens for the hotkey settings dialog and icon. The popup has
+        its own neutral palettes in PopupThemePalette.cs; see docs/DESIGN.md.
     -->
 
     <!-- ============================================================ colour: dark -->
