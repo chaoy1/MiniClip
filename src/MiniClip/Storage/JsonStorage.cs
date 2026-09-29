@@ -1,8 +1,11 @@
 // -----------------------------------------------------------------------------
 // MiniClip — clipboard history persistence.
 //
-// §12: the history lives in %LOCALAPPDATA%\MiniClip\history.json as an indented JSON
-// array of strings, newest entry first. Every write goes through a temporary file that
+// §12: the history lives in history.json as an indented JSON array of strings, newest
+// entry first. The directory is chosen by AppPaths: an installer-installed copy keeps it
+// in <install>\data beside the executable so that uninstalling removes every trace, while
+// a build run from bin\ or an unpacked portable copy falls back to
+// %LOCALAPPDATA%\MiniClip. Every write goes through a temporary file that
 // is flushed to disk and then swapped in, so an abnormal exit can never leave half a
 // JSON document behind; a file that cannot be parsed is preserved for inspection
 // instead of being silently overwritten.
@@ -24,6 +27,7 @@ using System.Text.Json;
 using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
+using MiniClip.Settings;
 
 namespace MiniClip.Storage;
 
@@ -90,9 +94,11 @@ public sealed record StorageResult(StorageOutcome Outcome, int Count, string? Pa
 /// </summary>
 /// <remarks>
 /// <para>
-/// The file is <c>%LOCALAPPDATA%\MiniClip\history.json</c> by default (§12 — local app data, never
-/// a roaming directory, so the history does not travel with a roaming profile). Tests and tools
-/// can point an instance elsewhere through the constructor.
+/// The file is <c>history.json</c> inside <see cref="AppPaths.DataDirectory"/>: an installer
+/// install keeps it in <c>&lt;install&gt;\data</c> next to the executable, everything else
+/// falls back to <c>%LOCALAPPDATA%\MiniClip</c> (§12 — never a roaming directory, so the
+/// history does not travel with a roaming profile). Tests and tools can point an instance
+/// elsewhere through the constructor.
 /// </para>
 /// <para>
 /// Every public member is safe to call from any thread, and from several threads at once: all work
@@ -123,12 +129,16 @@ public sealed class JsonStorage
     public const int MaxEntryLength = 100_000;
 
     /// <summary>
-    /// Gets the default history file location: <c>%LOCALAPPDATA%\MiniClip\history.json</c>.
+    /// Gets the default history file location: <c>&lt;data&gt;\history.json</c>, where
+    /// <c>&lt;data&gt;</c> is the install directory in portable mode and
+    /// <c>%LOCALAPPDATA%\MiniClip</c> otherwise. See <see cref="AppPaths"/>.
     /// </summary>
-    public static string DefaultHistoryPath { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "MiniClip",
-        "history.json");
+    /// <remarks>
+    /// Deliberately a property rather than a cached field: the answer depends on a marker
+    /// file and on whether the install directory is writable, both of which the self-test
+    /// changes at runtime. Caching it here would make the app report a stale location.
+    /// </remarks>
+    public static string DefaultHistoryPath => Path.Combine(AppPaths.DataDirectory, "history.json");
 
     /// <summary>
     /// Gets the fully qualified path of the history file this instance reads and writes.

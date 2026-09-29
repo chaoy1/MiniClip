@@ -36,7 +36,16 @@ if (-not $IsccExe -or -not (Test-Path -LiteralPath $IsccExe)) {
     throw 'Inno Setup ISCC.exe was not found. Pass -IsccExe with the compiler path.'
 }
 
-[xml]$projectXml = Get-Content -LiteralPath $projectPath -Raw
+# Read the version with an explicit UTF-8 read.
+#
+# This used to be `Get-Content -Raw | [xml]`, which broke as soon as the project gained a
+# non-ASCII value: the .csproj has no byte-order mark, and Windows PowerShell 5.1's
+# Get-Content decodes BOM-less files using the ANSI code page. The Chinese <Description>
+# then decoded to mojibake whose "</Description>" tail was mangled, so XML parsing failed
+# with a baffling "start tag does not match end tag" error. Reading through
+# [System.IO.File]::ReadAllText uses UTF-8 and is immune to the console code page.
+$projectText = [System.IO.File]::ReadAllText($projectPath, [System.Text.Encoding]::UTF8)
+[xml]$projectXml = $projectText
 $version = [string]$projectXml.Project.PropertyGroup.Version
 if (-not $version) {
     throw 'The MiniClip project has no Version property.'

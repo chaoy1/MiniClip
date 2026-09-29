@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using MiniClip.Input;
 using MiniClip.Storage;
+using MiniClip.Settings;
 
 namespace MiniClip.Diagnostics;
 
@@ -48,6 +49,7 @@ public static class SelfTest
         failures += CheckHistoryRules();
         failures += CheckHistorySaveRevision();
         failures += CheckStorageRoundTrip();
+        failures += CheckDataLocation();
         failures += CheckHistoryFailureSafety(output);
         failures += CheckUnusableHistoryFileClear(output);
         failures += CheckClearDuringClipboardRead(output);
@@ -515,6 +517,121 @@ public static class SelfTest
             $"outcome={deleteResult.Outcome} exists={File.Exists(path)}");
 
         return ok + shape + coalesced + corruptOk + deleteOk;
+    }
+
+    /// <summary>
+    /// Verifies where MiniClip puts its data, and that the portable decision is honest.
+    /// </summary>
+    /// <remarks>
+    /// This is the difference between "uninstall removes every trace" and "uninstall leaves
+    /// the clipboard history behind". The installer creates a marker file next to the
+    /// executable so the data lives in the chosen install folder; without the marker the app
+    /// must still work, falling back to %LOCALAPPDATA%. Both branches are exercised against
+    /// a throwaway directory so the check does not depend on how this particular build was
+    /// laid out on disk.
+    /// </remarks>
+    private static int CheckDataLocation()
+    {
+        var probeRoot = Path.Combine(Path.GetTempPath(), "miniclip-dataloc", Guid.NewGuid().ToString("N"));
+        int workspace, noMarker, unwritable;
+
+        try
+        {
+            // 1. A workspace that is not inside Program Files must accept portable mode.
+            var writableApp = Path.Combine(probeRoot, "writable-install");
+            Directory.CreateDirectory(writableApp);
+            File.WriteAllText(Path.Combine(writableApp, AppPaths.PortableMarkerName), "portable");
+
+            var portable = AppPaths.ResolveFor(writableApp);
+            var expectedData = Path.Combine(writableApp, AppPaths.DataFolderName);
+
+            workspace = Report(
+                "data location portable",
+                portable.Mode == DataLocationMode.Portable
+                && string.Equals(portable.Directory, expectedData, StringComparison.OrdinalIgnoreCase)
+                && Directory.Exists(expectedData),
+                $"mode={portable.Mode} dir={DiagnosticsLog.Shorten(portable.Directory)} insideAppDir={IsInside(portable.Directory, writableApp)}");
+
+            // 2. No marker: the documented %LOCALAPPDATA% behaviour must be preserved.
+            var plainApp = Path.Combine(probeRoot, "plain-install");
+            Directory.CreateDirectory(plainApp);
+
+            var legacy = AppPaths.ResolveFor(plainApp);
+            noMarker = Report(
+                "data location legacy",
+                legacy.Mode == DataLocationMode.LocalAppData
+                && string.Equals(legacy.Directory, AppPaths.LegacyDataDirectory, StringComparison.OrdinalIgnoreCase),
+                $"mode={legacy.Mode} dir={DiagnosticsLog.Shorten(legacy.Directory)}");
+
+            // 3. The case that actually matters for correctness: portable requested but the
+            //    folder cannot be written. This is what happens if a user installs into
+            //    C:\Program Files without admin rights, and the app must not lose the
+            //    history or crash — it must fall back and say why.
+            var blocked = Path.Combine(probeRoot, "ReadOnly-install");
+            Directory.CreateDirectory(blocked);
+            File.WriteAllText(Path.Combine(blocked, AppPaths.PortableMarkerName), "portable");
+
+            var acl = new System.Security.AccessControl.DirectorySecurity();
+            acl.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+            acl.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                System.Security.Principal.WindowsIdentity.GetCurrent().Name,
+                System.Security.AccessControl.FileSystemRights.ReadAndExecute,
+                System.Security.AccessControl.AccessControlType.Allow));
+            new DirectoryInfo(blocked).SetAccessControl(acl);
+
+            var fellBack = AppPaths.ResolveFor(blocked);
+            unwritable = Report(
+                "data location unwritable fallback",
+                fellBack.Mode == DataLocationMode.LocalAppDataFellBack
+                && string.Equals(fellBack.Directory, AppPaths.LegacyDataDirectory, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrEmpty(fellBack.FallbackReason),
+                $"mode={fellBack.Mode} reason={fellBack.FallbackReason ?? "(none)"}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or PlatformNotSupportedException or System.Security.SecurityException)
+        {
+            // Denying write access needs an ACL we are allowed to set. If the environment
+            // forbids that, say so plainly rather than reporting a pass we did not earn.
+            Console.WriteLine($"  data location check could not run: {ex.GetType().Name}");
+            return Report("data location", false, $"probe setup failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            try
+            {
+                // Read-only ACLs must be lifted or the delete fails.
+                foreach (var d in Directory.GetDirectories(probeRoot, "*", SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        var info = new DirectoryInfo(d);
+                        var open = new System.Security.AccessControl.DirectorySecurity();
+                        open.SetAccessRuleProtection(isProtected: false, preserveInheritance: true);
+                        info.SetAccessControl(open);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        // Best effort: a leftover temp folder is not worth failing over.
+                    }
+                }
+
+                Directory.Delete(probeRoot, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Same.
+            }
+        }
+
+        return workspace + noMarker + unwritable;
+    }
+
+    /// <summary>True when <paramref name="candidate"/> is inside <paramref name="parent"/>.</summary>
+    private static bool IsInside(string candidate, string parent)
+    {
+        var a = Path.GetFullPath(candidate).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var b = Path.GetFullPath(parent).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return a.StartsWith(b, StringComparison.OrdinalIgnoreCase);
     }
 
     private static int CheckHistoryFailureSafety(string output)

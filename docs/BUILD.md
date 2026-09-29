@@ -75,6 +75,8 @@ MiniClip 是托盘程序，**不会出现主窗口**：启动后进程常驻后�
 | 自包含 + 压缩 | 71.0 MB | 7 | **160.8 MB** | 440 ms | 否 |
 | 自包含 + 不打包单文件 | 155.7 MB | 269 | — | — | 否 |
 
+**安装包用的就是最后一行**：`tools/build-installer.ps1` 以 `--self-contained true -p:PublishSingleFile=false` 发布，得到 269 个文件、约 155.7 MB 的目录，再由 Inno Setup 用 `lzma2/ultra64` 压成 48.8 MB 的安装程序。这和第 3 条的“压缩”不是一回事——Inno 的压缩只作用于安装包本身，安装完成后磁盘上就是那 155.7 MB 的普通文件，运行时不会被解压进内存。
+
 四条关键结论：
 
 1. **141 MB 全部是 .NET 运行时，没有一分是 MiniClip 自己**。框架依赖版整个目录 **0.55 MB**——同一个程序，差约 270 倍。项目源码不过 3.5 MB。
@@ -188,7 +190,7 @@ lifecycle  ProcessExit
 
 ## 安装包
 
-安装包使用自包含 `win-x64` 发布：运行所需的 .NET 10 Desktop Runtime 已随程序打包。构建需要 .NET 10 SDK 和 Inno Setup 7；后者的 `ISCC.exe` 可通过参数指定：
+安装包使用自包含 `win-x64` 发布：运行所需的 .NET 10 Desktop Runtime 已随程序打包。构建脚本发布的是 **269 个文件、约 155.7 MB** 的自包含目录，再由 Inno Setup 以 `lzma2/ultra64` 压缩；当前产物 `dist\MiniClip-Setup-1.0.0-x64.exe` 为 **48.8 MB**（51,203,024 字节）。构建需要 .NET 10 SDK 和 Inno Setup 7；后者的 `ISCC.exe` 可通过参数指定：
 
 ```powershell
 & .\tools\build-installer.ps1 `
@@ -196,19 +198,38 @@ lifecycle  ProcessExit
   -IsccExe "$env:LOCALAPPDATA\Programs\Inno Setup 7\ISCC.exe"
 ```
 
-输出位于 `dist\MiniClip-Setup-1.0.0-x64.exe`。构建脚本会按项目版本命名安装包，并打印 SHA-256。安装向导始终显示目录选择页，默认安装到当前用户的 `%LOCALAPPDATA%\Programs\MiniClip`，可改为其他有写入权限的位置；不要求管理员权限。附加选项中可勾选“开机自动启动 MiniClip”，安装完成页可选择立即运行。安装或卸载前若 MiniClip 正在运行，向导会要求先从托盘退出。
+输出位于 `dist\MiniClip-Setup-1.0.0-x64.exe`。构建脚本会按项目版本命名安装包，并打印 SHA-256；版本号是用显式 UTF-8 读取从 `.csproj` 里取的，原因见 [VERIFICATION.md](VERIFICATION.md) 的“不能回退的构建配置结论”。
 
-无界面安装可使用 Inno Setup 的 `/VERYSILENT /DIR="<目录>" /TASKS="autostart"`；不传 `/TASKS` 时首次安装默认不开机启动。更换安装目录时请先卸载旧安装，避免旧目录留下未被新安装器管理的文件。安装包为当前用户安装，不包含代码签名证书。
+安装向导始终显示目录选择页（`DisableDirPage=no`），默认安装到当前用户的 `%LOCALAPPDATA%\Programs\MiniClip`——这个位置用户可写，“数据跟着安装目录走”才成立；也可以改成任意有写入权限的位置，不要求管理员权限。安装任务有两项，**默认都不勾选**：
+
+| 任务 | 内容 | 默认状态 |
+| --- | --- | --- |
+| `autostart` | 开机自动启动 MiniClip（写 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 的 `MiniClip` 值） | 不勾选；若该值已经存在，向导会自动勾上以反映当前实际状态 |
+| `desktopicon` | 创建桌面快捷方式 | 不勾选 |
+
+安装时会在安装目录写入标记文件 `MiniClip.portable`，它决定数据放在哪里，见下一节。安装完成页可选择立即运行。安装或卸载前若 MiniClip 正在运行，向导会提示先退出；即使没退出，安装/卸载过程也会**按可执行文件的完整路径**结束本安装目录下的那个实例——刻意不用按映像名结束，否则会把从别处运行的绿色版或另一个安装目录的实例一起杀掉。
+
+无界面安装可使用 Inno Setup 的 `/VERYSILENT /DIR="<目录>" /TASKS="autostart,desktopicon"`；不传 `/TASKS` 时两项都不执行，也就是首次安装默认不开机启动、不建桌面快捷方式。更换安装目录时请先卸载旧安装，避免旧目录留下未被新安装器管理的文件。安装包为当前用户安装，不包含代码签名证书。
+
+### `MiniClip.portable` 标记文件
+
+这个空标记文件是数据位置的开关。它来自 [installer/portable-marker.flag](../installer/portable-marker.flag)，由 `installer/MiniClip.iss` 的 `[Files]` 条目复制到安装目录并改名为 `MiniClip.portable`：
+
+- **标记存在，且安装目录可写**：[src/MiniClip/Settings/AppPaths.cs](../src/MiniClip/Settings/AppPaths.cs) 判定为便携布局，`history.json`、`settings.json` 和诊断日志都写进 `<安装目录>\data\`。这是安装包的默认形态，也是“卸载不留痕迹”成立的前提。
+- **删掉标记**：程序下次启动时找不到它，就回到 `%LOCALAPPDATA%\MiniClip\`。注意这不会搬走已有数据——原来 `data\` 里的历史仍留在安装目录，新写入的换到用户数据目录。
+- **标记存在但安装目录不可写**（普通用户装进 `C:\Program Files` 就是这种情况）：程序回退到 `%LOCALAPPDATA%\MiniClip\`，并在托盘提示「安装目录不可写，历史已改存到用户数据目录」，而不是静默丢掉历史。“可写”是用真实的创建/写入/删除探针测出来的，不是看目录是否存在——目录存在却拒绝写入正是最常见的失败形态。
 
 ## 卸载与数据
 
-**通过安装包安装的版本，卸载会删除 MiniClip 的全部本地数据。** 卸载器移除安装文件、开始菜单入口、卸载注册信息、开机启动注册表值及 Windows 启动管理器中对应的 MiniClip 状态，以及整个用户数据目录：
+数据写在哪里由可执行文件旁边有没有 `MiniClip.portable` 决定，启动时解析一次（[src/MiniClip/Settings/AppPaths.cs](../src/MiniClip/Settings/AppPaths.cs)）。三种情况：
 
-```
-%LOCALAPPDATA%\MiniClip\
-```
+| 情况 | 数据目录 | `AppPaths.Mode` |
+| --- | --- | --- |
+| 通过安装包安装（有标记，且安装目录可写） | `<安装目录>\data\` | `Portable` |
+| 绿色发布包，或从 `bin\` 直接运行（没有标记） | `%LOCALAPPDATA%\MiniClip\` | `LocalAppData` |
+| 有标记但安装目录不可写 | 回退到 `%LOCALAPPDATA%\MiniClip\`，托盘提示「安装目录不可写，历史已改存到用户数据目录」 | `LocalAppDataFellBack` |
 
-本机该目录的实际内容：
+三个写入者都走这同一个入口：[src/MiniClip/Storage/JsonStorage.cs](../src/MiniClip/Storage/JsonStorage.cs)（`DefaultHistoryPath` 是每次重新求值的属性，不是启动时缓存的字段）、[src/MiniClip/Settings/SettingsStore.cs](../src/MiniClip/Settings/SettingsStore.cs) 和 [src/MiniClip/Diagnostics/DiagnosticsLog.cs](../src/MiniClip/Diagnostics/DiagnosticsLog.cs)；诊断日志和数据放在同一个目录。两种布局下目录里的文件相同：
 
 | 文件 | 内容 |
 | --- | --- |
@@ -219,9 +240,15 @@ lifecycle  ProcessExit
 | `settings.corrupt-<时间戳>.json` | 仅在设置文件损坏时出现 |
 | `history.json.tmp` | 仅在写入过程中异常中断时可能残留，可以安全删除 |
 
-卸载将永久删除上述历史、设置、日志及损坏文件备份；需要保留的内容应在卸载前自行备份。用户选择的安装目录若包含其他文件，卸载器只删除它安装的文件，不递归删除该目录中的无关内容。Windows 自己维护的预取、最近使用等系统缓存不属于 MiniClip 数据。删除文件不等于安全擦除磁盘数据。
+**通过安装包安装的版本，卸载会删除数据目录里的全部内容。** 卸载器移除：安装文件、开始菜单入口（勾选过 `desktopicon` 时还有桌面快捷方式）、卸载注册信息、`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 的 `MiniClip` 值、Windows 启动管理器中对应的状态（`StartupApproved\Run` 与 `Run32`），以及数据目录本身。具体清理动作写在 `installer/MiniClip.iss` 的 `[UninstallDelete]` 与 `[Code]` 里，一共三个路径：
 
-直接使用绿色发布包的版本没有卸载器：删除发布文件后，`%LOCALAPPDATA%\MiniClip\` 和开机启动值仍需手动清理。托盘的“清空历史”只删 `history.json`，不删 `settings.json` 和诊断日志。
+- `<安装目录>\data\`：整个子树，历史、设置、日志和损坏文件备份都在里面
+- `<安装目录>\MiniClip.portable`：标记文件
+- `%LOCALAPPDATA%\MiniClip`：整个子树，针对旧版本或用户手工拷贝的绿色版安装
+
+`CurUninstallStepChanged` 在 `usPostUninstall` 里还会再取一次 `{app}\data` 并 `DelTree`：用户可以装到任意位置，只靠 `[UninstallDelete]` 里的常量路径不够稳。卸载将永久删除上述历史、设置、日志及损坏文件备份；需要保留的内容应在卸载前自行备份。安装目录里的其他文件不会被删——`[UninstallDelete]` 只列了上面三个路径，安装文件被移除、`data\` 被删除之后目录清空并随之移除；如果用户往安装目录里放了别的东西，目录会保留。Windows 自己维护的预取、最近使用等系统缓存不属于 MiniClip 数据。删除文件不等于安全擦除磁盘数据。
+
+直接使用绿色发布包的版本没有卸载器：删掉发布文件只删掉程序，`%LOCALAPPDATA%\MiniClip\` 里的历史、设置、日志以及 `HKCU\...\Run` 的开机启动值都还在，需要手动清理。托盘的“清空历史”只删 `history.json`，不删 `settings.json` 和诊断日志。
 
 ## 开机启动
 
@@ -237,7 +264,7 @@ lifecycle  ProcessExit
 - 这项设置对当前用户可见、可改：任务管理器的“启动”选项卡里会出现 `MiniClip`，可以在那里直接禁用。
 - 程序读这个值时只在值存在、能解析出路径、且该路径上的文件确实存在时才认为“已开启”，所以移动或删除程序之后，开关会自动显示为关闭状态。
 - 通过设置对话框关闭开关会删除这个注册表值。
-- 安装向导的“开机自动启动”选项也操作同一个值；卸载时删除它。
+- 安装向导的 `autostart` 任务也操作同一个值（默认不勾选；若该值已经存在，向导会自动勾上以反映现状）。卸载时会删除这个值，同时清掉 Windows 启动管理器里的 `StartupApproved\Run` / `Run32` 状态：在任务管理器里禁用过“启动”项之后，那些状态会压过注册表值，只删值不删状态会让下一次安装仍旧显示为已禁用。
 
 ## 设计交付物的重新生成
 

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using MiniClip.Settings;
 
 namespace MiniClip.Diagnostics;
 
@@ -96,10 +97,8 @@ public static class DiagnosticsLog
     /// <summary>True when a log has been started.</summary>
     public static bool IsEnabled => _path is not null;
 
-    public static string DefaultDirectory =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "MiniClip");
+    /// <summary>Where logs go: the install directory in portable mode, AppData otherwise.</summary>
+    public static string DefaultDirectory => AppPaths.DataDirectory;
 
     /// <summary>Starts writing to <paramref name="path"/>, or to the default log file.</summary>
     /// <remarks>

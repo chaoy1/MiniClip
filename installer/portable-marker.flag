@@ -1,0 +1,4 @@
+MiniClip portable-data marker.
+Do not delete: this file tells MiniClip to keep history, settings and logs in the
+"data" folder beside the executable instead of %LOCALAPPDATA%. Removing it makes the
+app fall back to %LOCALAPPDATA%\MiniClip.

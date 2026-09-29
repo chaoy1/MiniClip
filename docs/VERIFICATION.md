@@ -20,7 +20,7 @@ dotnet build src\MiniClip\MiniClip.csproj -c Release    # 期望 0 警告 0 错�
 - 输出目录会得到 `selftest.log` 和**六张** PNG 快照（`popup-default`、`popup-multiline-selected`、`popup-long-line-selected`、`popup-whitespace-selected`、`popup-scrolled-30`、`popup-empty`）。
 - 自检不会启动真正的 MiniClip：不注册全局快捷键、不创建托盘图标、不接管剪贴板，跑完直接退出。因此它可以在 MiniClip 正在运行时执行；这种情况下“热键注册”一项会报告 Alt + V 被占用，按预期通过。
 - 参数 `--selftest` 与 `--self-test` 等价。
-- **不要并行跑两个自检，也不要让自检和别的自动化脚本同时点这个 exe。** 本次核对期间就撞上过：同一台机器上另一个脚本按进程名清理 `MiniClip.exe` 并反复重跑，结果一次运行被从外部结束（退出码 `-1`、只落了 4 张快照），另有几次 `selftest.log` 在后半段被改写，同一次运行的 `navigation routing` 之后的记录跑进了 `%LOCALAPPDATA%\MiniClip\miniclip-<pid>.log`。`selftest.log` 用 `File.AppendAllText` 追加，不是原子独占，并发写会互相覆盖。**判读自检结果请以控制台输出为准，并保存一份**——本次运行保存在 [artifacts/selftest-release/selftest-console-verified.txt](../artifacts/selftest-release/selftest-console-verified.txt)，它是完整的 26 行 `[PASS]` 加 `ALL CHECKS PASSED`。
+- **不要并行跑两个自检，也不要让自检和别的自动化脚本同时点这个 exe。** 本次核对期间就撞上过：同一台机器上另一个脚本按进程名清理 `MiniClip.exe` 并反复重跑，结果一次运行被从外部结束（退出码 `-1`、只落了 4 张快照），另有几次 `selftest.log` 在后半段被改写，同一次运行的 `navigation routing` 之后的记录跑进了 `%LOCALAPPDATA%\MiniClip\miniclip-<pid>.log`（当次是从 `bin\` 直接运行的构建，没有 `MiniClip.portable` 标记，所以日志在 `%LOCALAPPDATA%`；安装包安装的版本日志在 `<安装目录>\data\`）。`selftest.log` 用 `File.AppendAllText` 追加，不是原子独占，并发写会互相覆盖。**判读自检结果请以控制台输出为准，并保存一份**——本次运行保存在 [artifacts/selftest-release/selftest-console-verified.txt](../artifacts/selftest-release/selftest-console-verified.txt)，它是完整的 26 行 `[PASS]` 加 `ALL CHECKS PASSED`。
 
 最近一次完整记录（[artifacts/selftest-release/selftest-console-verified.txt](../artifacts/selftest-release/selftest-console-verified.txt)）：**26 项检查全部通过**，退出码 `0`。运行环境为 os=10.0.26100.0、dpiAwareness=per-monitor、dotnet=10.0.1、Release 配置、work area 2520×1680（150% 缩放）。复现命令与读数：
 
@@ -34,9 +34,13 @@ ALL CHECKS PASSED
 
 > 本次核对里 `artifacts\selftest-release\selftest.log` 出现过两种状态：有的运行是完整的（26 行 `=pass`、末行 `result=pass`），有的运行在第 35 行 `close requested reason=Escape` 处截止、缺 `result=pass`，缺的那部分出现在 `%LOCALAPPDATA%\MiniClip\miniclip-<pid>.log` 里。原因是并发的另一次自检（或 `--run` 定时运行）改写了同一个文件（见上一条）。**结论：这份日志不是可靠的证据文件，控制台输出才是。** 仓库里较早的一份日志 [artifacts/selftest-debug/selftest.log](../artifacts/selftest-debug/selftest.log) 同样在第 35 行截断，而且同目录缺 `popup-scrolled-30.png`，它只能当历史记录看。
 
+> 用**当前**构建跑同一条命令会打印 **57 项** `[PASS]` 加 `ALL CHECKS PASSED`：自检项随实现增加，下面那张表只记录了其中 26 项，新增部分见“安装包端到端验证”和 [VERIFICATION-2026-09-27-reliability-menu.md](VERIFICATION-2026-09-27-reliability-menu.md)。
+
 ## 检查项对照表
 
 每一项都打印一行 `[PASS]` / `[FAIL]` 加一段可复核的实测值，共 **26 项**；“实测值示例”一列直接摘自上面那份控制台记录。**加粗的五项是本次核对新增或改写过的检查**（原先只有 21 项，没有钩子调用、钩子路由、导航路由和长列表滚动，空状态那一项也不检查尺寸）。
+
+> **这张表不等于当前构建的全部检查。** 它是安装包之前那份 26 项快照。表末三项——`data location portable`、`data location legacy`、`data location unwritable fallback`——是随“数据跟着安装目录走”一起加入的检查，同样加粗；连同 2026-09-27 之后的其它检查，**当前 Release 自检共 57 项，全部通过**（见下文“安装包端到端验证”）。
 
 | 检查项 | 证明什么 | 怎么测的 | 实测值示例 |
 | --- | --- | --- | --- |
@@ -66,8 +70,42 @@ ALL CHECKS PASSED
 | **`long list scrolling`** | **30 条历史全都能浏览到，不只是前 8 条**：列表真的溢出、滚动真的有偏移、被选中的第 21 行真的落进视口 | 用 `HistoryManager.DefaultCapacity`（30）条记录 `ShowAt`，按 ↓ 走 20 次，读 `ScrollViewer.ScrollableHeight` / `VerticalOffset`，再用 `TransformToAncestor` 把选中容器的上下沿换算到视口坐标比较 | `30 entries, windowHeight=368 scrollable=881 offset=511 selected=20 visible=True` |
 | `popup empty state` | 历史为空时候选框没有选中项、没有可粘贴内容，`Enter` 不可能误粘贴（§9.2）；**并且面板按两行文案定尺寸，不是按一行列表** | 用空列表 `ShowAt`，检查 `SelectedIndex == -1` 且 `SelectedText is null`；同一次还落盘 `popup-empty.png` 供逐像素复核（见下文“已修正的核对结论”第三节） | `no selection, nothing to paste`（快照 800×216 px = 400×108 DIP） |
 | `memory footprint` | 把**自检进程**实际占用读出来，作为 §26 内存目标的对照。注意这不是常驻托盘时的读数 | `Process.WorkingSet64` 与 `Process.PrivateMemorySize64` | `workingSet=159MB private=102MB` |
+| **`data location portable`** | **可执行文件旁边有 `MiniClip.portable` 且目录可写时，数据目录必须是 `<安装目录>\data`**——这是“卸载能删干净”成立的前提 | 在 `%TEMP%` 下建一个临时目录，放入标记文件，调用 `AppPaths.ResolveFor`（与运行时同一段解析代码，不是复制的副本），断言 `Mode=Portable`、目录等于 `<临时目录>\data`、且该目录已被创建 | `mode=Portable dir=…\writable-install\data insideAppDir=True` |
+| **`data location legacy`** | **没有标记文件时必须保留 `%LOCALAPPDATA%\MiniClip` 的老行为**，否则绿色发布包和从 `bin\` 直接跑的构建会把历史写进意想不到的地方 | 另建一个不放标记的临时目录，再调用 `AppPaths.ResolveFor`，断言 `Mode=LocalAppData` 且目录等于 `AppPaths.LegacyDataDirectory` | `mode=LocalAppData dir=…\AppData\Local\MiniClip` |
+| **`data location unwritable fallback`** | **有标记但目录不可写时（普通用户装进 `C:\Program Files` 就是这种情况），必须回退到 `%LOCALAPPDATA%\MiniClip` 并给出原因**，既不能丢历史也不能崩；这是三种情况里唯一真正影响正确性的一种 | 再建一个临时目录、放入标记文件，然后用 ACL 把它设成只读（只留 ReadAndExecute），断言 `Mode=LocalAppDataFellBack`、目录回退、且 `FallbackReason` 非空。环境不允许设 ACL 时直接报失败，不给自己发合格证 | `mode=LocalAppDataFellBack reason=install directory not writable (…)` |
+
+> 后三项的“实测值示例”按 [src/MiniClip/Diagnostics/SelfTest.cs](../src/MiniClip/Diagnostics/SelfTest.cs) 里 `CheckDataLocation()` 的打印格式给出：目录字段经 `DiagnosticsLog.Shorten` 缩短，回退原因的具体异常类型来自当次探针失败（探针是真的去创建、写入、删除一个文件，不是检查目录是否存在）。57 项全过的那次运行里，三项分别报告 `mode=Portable`、`mode=LocalAppData`、`mode=LocalAppDataFellBack`。
 
 关于扩展样式那一项的补充：`exStyle=0x08080088` 拆开是 `WS_EX_TOPMOST (0x00000008)` + `WS_EX_TOOLWINDOW (0x00000080)` + `WS_EX_NOACTIVATE (0x08000000)`。也就是说，Windows 侧确实把这个窗口标记为“可以显示但永不激活”，而它同时不在 Alt+Tab 列表里（TOOLWINDOW）、并且置顶。证据位置：控制台记录 [artifacts/selftest-release/selftest-console-verified.txt](../artifacts/selftest-release/selftest-console-verified.txt) 里的 `popup window styles` 一行；`selftest.log` 里的同一条记录在 [artifacts/selftest-release/selftest.log](../artifacts/selftest-release/selftest.log)，但那份日志可能被并发运行改写，原因见上文“如何复现”。
+
+## 安装包端到端验证（15/15）
+
+自检是在进程内跑的行为探针，它证明不了安装包会不会把数据留在用户数据目录里。所以本轮做了一次真正的端到端验证：**15 项检查全部通过**。
+
+方法是静默安装到自定义目录、运行程序、再静默卸载，然后断言什么都不剩——这正是“数据跟着安装目录走，卸载不留痕迹”要证明的那件事。被测目录刻意不取默认值，避免默认路径上的巧合掩盖问题：
+
+```powershell
+# 1. 静默安装到自定义的非默认路径
+.\dist\MiniClip-Setup-1.0.0-x64.exe /VERYSILENT /DIR="D:\MC-Install-Test\MiniClip"
+# 2. 运行一次安装目录里的 MiniClip.exe，让它写出设置与诊断日志
+# 3. 静默卸载
+& "D:\MC-Install-Test\MiniClip\unins000.exe" /VERYSILENT
+```
+
+其中最关键的实测读数：
+
+| 阶段 | 实测值 |
+| --- | --- |
+| 静默安装 | 退出码 `0` |
+| 标记文件 | `D:\MC-Install-Test\MiniClip\MiniClip.portable` 存在 |
+| 开机启动值 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 的 `MiniClip` = `"D:\MC-Install-Test\MiniClip\MiniClip.exe"` |
+| 运行一次之后 | `<安装目录>\data\` 里有 `settings.json` 和 1 个诊断日志；`%LOCALAPPDATA%` 下**没有任何** MiniClip 写入 |
+| 静默卸载 | 退出码 `0` |
+| 卸载之后 | 安装目录消失、`data\` 消失、`Run` 值消失；`%LOCALAPPDATA%\MiniClip` 无残留 |
+
+同一个安装包的其它读数：安装包体积 **48.8 MB**（`dist\MiniClip-Setup-1.0.0-x64.exe`，51,203,024 字节）；自检 **57 项全部通过**；Release 构建 **0 警告 0 错误**。
+
+这次验证的另一半结论同样重要——**装到不可写的位置时，程序不会假装成功，也不会丢历史**：`data location unwritable fallback` 一项覆盖的就是这条回退路径，回退时托盘会明确提示「安装目录不可写，历史已改存到用户数据目录」。相关实现见 [src/MiniClip/Settings/AppPaths.cs](../src/MiniClip/Settings/AppPaths.cs)。
 
 ## 自检没有覆盖什么
 
@@ -113,12 +151,12 @@ ALL CHECKS PASSED
 5. 把鼠标移到屏幕右下角、右上角、左下角、左上角，各按一次 Alt + V：候选框每次都完整可见，贴边时向另一侧翻转，不越过任务栏。
 6. 如果有第二块显示器：把鼠标移到第二块屏（尤其是与主屏缩放比例不同的那块）上呼出候选框，确认它出现在鼠标所在的那块屏，且大小与清晰度正常。
 7. 复制一段超过 100,000 字符的文本、复制一张图片、复制一个文件：历史都不应该变化。复制一段与顶部相同的文本：条数不变。复制一条较早的文本：它移到顶部而不是新增。
-8. 新增几条之后用任务管理器强制结束 MiniClip 进程再启动：历史应该还在。点“清空历史”后重启：应该为空。打开 `%LOCALAPPDATA%\MiniClip\miniclip-<pid>.log` 检查全文不含任何剪贴板原文。
+8. 新增几条之后用任务管理器强制结束 MiniClip 进程再启动：历史应该还在。点“清空历史”后重启：应该为空。打开诊断日志检查全文不含任何剪贴板原文：日志和数据放在同一个目录里，日志文件名形如 `miniclip-<pid>-<时间戳>-<序号>.log`；**用安装包装的版本去 `<安装目录>\data\` 里看，绿色发布包去 `%LOCALAPPDATA%\MiniClip\` 里看**。
 9. 验证快捷键冲突提示：让另一个程序占住 MiniClip 当前使用的组合（例如先用 MiniClip 自己注册 Alt + V，再从另一个进程注册同一组合），确认托盘状态行与气球提示都明确说明注册失败，而不是假装可用。也可以直接跑一次 `MiniClip.exe --selftest`：控制台里 `hotkey register` 一项会显示“已被其他程序占用”，这一行就是冲突路径真实触发的证据。
 10. 从托盘退出，确认进程真的结束（任务管理器里没有残留），且键盘行为完全正常。
 11. **新增（针对本轮修好的两处）：** 连按两次 Alt + V，或者按 Alt + V 之后立刻按 Esc，**在候选框还没有画出来之前**就结束它——窗口必须消失，不能留在屏幕上。这是 `Close1` 以前那个动画完成事件 bug 的现场条件，现在 `DispatcherTimer` 是兜底（见下文“曾经报错的缺陷”第 1 条）。
 12. **新增：** 攒够 9 条以上历史后呼出候选框，连续按 ↓ 走到底：高亮行必须始终在可视区域内，列表要有细滚动指示，Enter 粘出来的必须是屏幕上高亮的那一条。
-13. **新增：** 复制一段含双引号和中文的代码（例如 `he said "hi" & <b> and 中文 ok`），打开 `%LOCALAPPDATA%\MiniClip\history.json`：应当能直接读懂，不应出现 `\u0022` / `\u0026` 这类转义（emoji 仍会写成 `\uD83D\uDE42` 代理对，那是正常的）。
+13. **新增：** 复制一段含双引号和中文的代码（例如 `he said "hi" & <b> and 中文 ok`），打开历史文件：应当能直接读懂，不应出现 `\u0022` / `\u0026` 这类转义（emoji 仍会写成 `\uD83D\uDE42` 代理对，那是正常的）。文件位置同样取决于布局——安装包安装的是 `<安装目录>\data\history.json`，绿色发布包是 `%LOCALAPPDATA%\MiniClip\history.json`。
 
 ## 已修正的核对结论
 
@@ -271,7 +309,7 @@ dotnet build src\MiniClip\MiniClip.csproj -c Release --no-incremental
 
 三种编码器的往返（`Deserialize` → 序数比较）**都是精确的**，所以这个选择只影响可读性，不影响正确性。“Unsafe”指的是放宽 HTML 敏感的转义——只有把 JSON 内嵌进标记语言时才有风险；这个文件写在用户自己的目录里、由同一个程序读回，不涉及这个场景。
 
-**怎么证明它在修好之后仍然成立——一次真实的剪贴板往返：** 用 Python 通过 Win32 API 写系统剪贴板（PowerShell 传参会把引号弄坏），内容 `he said "hi" & <b> and 中文 ok`，等 MiniClip 落盘后直接读 `%LOCALAPPDATA%\MiniClip\history.json` 的原始字节：
+**怎么证明它在修好之后仍然成立——一次真实的剪贴板往返：** 用 Python 通过 Win32 API 写系统剪贴板（PowerShell 传参会把引号弄坏），内容 `he said "hi" & <b> and 中文 ok`，等 MiniClip 落盘后直接读 `%LOCALAPPDATA%\MiniClip\history.json` 的原始字节（这次测量在安装包出现之前，程序是从 `bin\` 直接运行的，所以当时就是 `%LOCALAPPDATA%` 布局；装了安装包之后同一份文件变成 `<安装目录>\data\history.json`，内容格式不变）：
 
 ```python
 import win32clipboard, win32con
@@ -307,9 +345,9 @@ first 4 bytes          : 5B 0D 0A 20        （'[' CR LF ' '，无 BOM）
 - `WNDCLASSEXW.lpszClassName` 必须用指针，不能用 `ByValTStr`（下一节）。
 - `KeyboardHook` 用**钩子事件流**跟踪修饰键，而不是 `GetAsyncKeyState`：Alt + V 打开候选框时用户手还按着 Alt，`SendInput` 只是把事件排队，异步键态还没反映出来，轮询会把每次 `↑` 都看成 `Alt+↑`，整份列表静默失效。这条结论没有变。
 
-## 三个不能回退的构建配置结论
+## 不能回退的构建配置结论
 
-这三条是实际复现出来的故障及其修法，不是风格偏好。改动它们会重新引入已经修好的 bug。
+下面这些是实际复现出来的故障及其修法，不是风格偏好。改动它们会重新引入已经修好的 bug。前三条是构建配置，后三条是做安装包时踩到的。
 
 ### 一、`InvariantGlobalization` 必须保持 `false`
 
@@ -338,6 +376,30 @@ first 4 bytes          : 5B 0D 0A 20        （'[' CR LF ' '，无 BOM）
 `HairlineScrollBar` 必须定义在 `App.xaml` 的 `Application.Resources` 里，不能挪回 `PopupWindow.xaml` 的 `Window.Resources`。嵌套资源字典（`ScrollViewer.Resources`）在解析期解析 `BasedOn="{StaticResource ...}"` 时看不到外层 `Window.Resources` 的键；它**只在编译过的 Release XAML 构建里失败，Debug 容忍**，所以是可以一路发布出去的缺陷。详见上一节第 3 条。
 
 **操作含义：** 动过 `App.xaml` / 任何 `Window.Resources` / `ScrollViewer.Resources` 之后，Release 构建必须实际跑一遍，不能只看 Debug 通过。Release 自检里的 `popup window styles` 与 `popup-default.png` 就是这条配置的哨兵。
+
+### 四、构建脚本必须用显式 UTF-8 读 `.csproj`，不能用 `Get-Content -Raw | [xml]`
+
+`src/MiniClip/MiniClip.csproj` **没有 BOM**。Windows PowerShell 5.1 的 `Get-Content` 对无 BOM 文件按 ANSI 代码页解码，于是里面的中文 `<Description>` 被解成乱码——连 `</Description>` 的结尾一起被破坏——`[xml]` 接着抛出“开始标记与结束标记不匹配”的解析错误。报错位置和真正的原因（编码）毫无关系，很容易让人往 XML 结构上去查。
+
+**修法：** [tools/build-installer.ps1](../tools/build-installer.ps1) 改用 `[System.IO.File]::ReadAllText($projectPath, [System.Text.Encoding]::UTF8)` 读取，绕开控制台代码页。
+
+**记住这条：** 脚本里读这个项目文件、以及任何可能包含中文的源文件时，都要显式指定 UTF-8，不要依赖 `Get-Content` 的默认解码。项目一旦加入任何非 ASCII 文本，这类错误就会第一次出现。
+
+### 五、需要 `{app}` 的代码不能放在 `InitializeSetup()` 里
+
+`InitializeSetup()` 在用户选好安装目录**之前**执行，此时 `{app}` 尚未初始化，`ExpandConstant('{app}')` 会直接抛出：
+
+```text
+内部错误：An attempt was made to expand the "app" constant before it was initialized
+```
+
+安装当场终止。**修法：** 原先在 `InitializeSetup()` 里调用的“结束正在运行的旧实例”已移到 `CurStepChanged(ssInstall)`——那个时点安装目录已经确定、常量可用，而且刚好在复制文件之前，正是需要它的时机。[installer/MiniClip.iss](../installer/MiniClip.iss) 里保留了这段说明，免得以后有人把它挪回去。
+
+### 六、Inno Setup 的 Pascal 注释里不能出现花括号
+
+Inno 的 Pascal 注释以花括号界定，注释正文里**任何**一个花括号都会提前结束注释。一条解释 `{app}` 用法的注释因此把它后面的代码变成了语法错误，而报错指向一个毫不相干的列——这个现象整整花掉三次来回才定位。
+
+**记住这条：** 注释里不要写字面花括号。[installer/MiniClip.iss](../installer/MiniClip.iss) 现在的写法是用文字说明（例如“正文里不要写花括号常量名，原因见 `StopMiniClip` 上方的说明”），而不是把常量名原样写进注释。
 
 ## 性能目标怎么测
 
@@ -390,7 +452,7 @@ t= 30s  WS=55.66 MB  Private=13.90 MB  Threads=9   Handles=303
 
 源码里**没有**任何计时埋点或基准测试代码（检索 `Stopwatch` / `ElapsedMilliseconds` 等无结果），`DiagnosticsLog` 只有 `ReadMemory()` 一个读数函数。所以其余四个目标目前都无法从仓库直接得到数字，测量需要外部手段：
 
-- **启动时间**：从进程创建到托盘图标可用的时间。可用 PowerShell 记时：启动进程后轮询通知区域图标出现并不容易，实用做法是启动进程并记录时间戳，然后看同一次启动写入 `%LOCALAPPDATA%\MiniClip\miniclip-<pid>.log` 的时间差——日志的第一行带毫秒时间戳。重复 30 次，记录中位数和最慢值。
+- **启动时间**：从进程创建到托盘图标可用的时间。可用 PowerShell 记时：启动进程后轮询通知区域图标出现并不容易，实用做法是启动进程并记录时间戳，然后看同一次启动写入诊断日志的时间差——日志的第一行带毫秒时间戳。日志目录取决于布局：安装包安装的是 `<安装目录>\data\`，绿色发布包是 `%LOCALAPPDATA%\MiniClip\`（下同，`miniclip-<pid>-<时间戳>-<序号>.log`）。重复 30 次，记录中位数和最慢值。
 - **候选框首帧延迟**：从 `WM_HOTKEY` 到窗口首帧可见。这需要在 `MiniClipController.OnWindowMessage`（收到 `WM_HOTKEY` 的位置）到 `PopupWindow.ShowAt` 之后加临时计时点，或用一个外部工具记录按键时间与截屏中面板出现的时间差。当前没有现成测量。
 - **内存**：按上面“内存的两个口径”的命令做，**不要**引用自检的 `memory footprint` 行当作产品占用。
 

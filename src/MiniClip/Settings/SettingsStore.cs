@@ -24,11 +24,10 @@ public sealed class SettingsStore
     }
 
     /// <summary>
-    /// %LOCALAPPDATA%\MiniClip — deliberately local, not roaming, so the history
-    /// never rides along with a roaming profile. §12.
+    /// The directory settings live in: the install directory in portable mode,
+    /// <c>%LOCALAPPDATA%\MiniClip</c> otherwise. See <see cref="AppPaths"/>.
     /// </summary>
-    public static string DefaultDirectory =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MiniClip");
+    public static string DefaultDirectory => AppPaths.DataDirectory;
 
     public string SettingsPath { get; }
 
