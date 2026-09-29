@@ -33,6 +33,9 @@ public static class AppPaths
     private static readonly object Gate = new();
     private static Resolution? _cached;
 
+    /// <summary>Guards the one-time import so it cannot run twice in a session.</summary>
+    private static bool _importDone;
+
     private static Resolution Current
     {
         get
@@ -85,6 +88,38 @@ public static class AppPaths
         lock (Gate)
         {
             _cached = null;
+            _importDone = false;
+        }
+    }
+
+    /// <summary>
+    /// Prepares the data directory — creating it, and performing the one-time import of
+    /// pre-existing <c>%LOCALAPPDATA%</c> data when this copy is allowed to. Idempotent.
+    /// </summary>
+    /// <remarks>
+    /// Must run before anything reads history or settings. <see cref="DataDirectory"/> alone
+    /// cannot do it, because it is read from many places, including property getters, and an
+    /// import is a side effect that must happen exactly once and only at startup.
+    /// </remarks>
+    /// <returns>True when existing data was imported.</returns>
+    public static bool EnsureDataDirectory()
+    {
+        lock (Gate)
+        {
+            if (_importDone)
+            {
+                return false;
+            }
+
+            _importDone = true;
+
+            var resolution = Current;
+            if (resolution.Mode != DataLocationMode.Portable || !resolution.MayImportLegacyData)
+            {
+                return false;
+            }
+
+            return TryImportLegacyData(resolution.Directory, out _);
         }
     }
 
@@ -93,24 +128,105 @@ public static class AppPaths
     /// the cached answer the running app uses.
     /// </summary>
     /// <remarks>
-    /// This exists so the portable/fallback decision can be tested for real rather than
-    /// argued about. The self-test builds a throwaway folder, puts a marker in it, and asks
-    /// this method — which is the same code path <see cref="Resolve"/> uses, not a copy of
-    /// it, so the test cannot drift away from the behaviour it claims to check.
+    /// <para>Data beside the executable is the <b>default</b>, not an opt-in. A user who
+    /// unzips the portable package expects it to be self-contained and to leave nothing
+    /// behind elsewhere; that was previously only true if they knew to create a marker
+    /// file, which is not a reasonable thing to require.</para>
+    /// <para>The marker file's remaining job is narrower and important: it authorises
+    /// <b>importing</b> data that already exists in <c>%LOCALAPPDATA%\MiniClip</c>. A build
+    /// run straight from <c>bin\</c> also gets its own <c>data\</c> folder, and it must not
+    /// help itself to the real installation's history. Only an installer-created marker
+    /// says "this copy is allowed to adopt the existing data".</para>
+    /// <para>If the application directory is not writable — an unusual place to unpack an
+    /// archive, but possible — the app falls back to <c>%LOCALAPPDATA%</c> rather than
+    /// failing to save anything.</para>
     /// </remarks>
     internal static Resolution ResolveFor(string applicationDirectory)
     {
         var marker = Path.Combine(applicationDirectory, PortableMarkerName);
+        var mayImport = File.Exists(marker);
+        var portableDirectory = Path.Combine(applicationDirectory, DataFolderName);
 
-        if (!File.Exists(marker))
+        if (TryPrepareWritableDirectory(portableDirectory, out var failure))
         {
-            return new Resolution(LegacyDataDirectory, DataLocationMode.LocalAppData, null);
+            return new Resolution(portableDirectory, DataLocationMode.Portable, null, mayImport);
         }
 
-        var portableDirectory = Path.Combine(applicationDirectory, DataFolderName);
-        return TryPrepareWritableDirectory(portableDirectory, out var failure)
-            ? new Resolution(portableDirectory, DataLocationMode.Portable, null)
-            : new Resolution(LegacyDataDirectory, DataLocationMode.LocalAppDataFellBack, failure);
+        // Portable is the default but this folder refuses writes; keep working from the
+        // user data directory and report why.
+        return new Resolution(LegacyDataDirectory, DataLocationMode.LocalAppDataFellBack, failure, false);
+    }
+
+    /// <summary>
+    /// Copies an existing <c>%LOCALAPPDATA%\MiniClip</c> into the portable data directory,
+    /// once, when the marker authorises it and the destination has no data yet.
+    /// </summary>
+    /// <remarks>
+    /// Without this, switching the portable package to portable data would look to an
+    /// existing user like their entire clipboard history had been wiped — the files would
+    /// still be on disk, but the app would no longer read them. Copying rather than moving
+    /// is deliberate: if anything goes wrong afterwards, the original is still there.
+    /// User-level files are copied one by one and a failure on any single file is not fatal.
+    /// </remarks>
+    internal static bool TryImportLegacyData(string portableDirectory, out int copied) =>
+        TryImportFrom(LegacyDataDirectory, portableDirectory, out copied);
+
+    /// <summary>
+    /// The import itself, with the source injectable so it can be tested against a throwaway
+    /// directory instead of the user's real <c>%LOCALAPPDATA%</c>. The self-test must never
+    /// touch real data to prove a behaviour.
+    /// </summary>
+    internal static bool TryImportFrom(string sourceDirectory, string portableDirectory, out int copied)
+    {
+        copied = 0;
+
+        if (!Directory.Exists(sourceDirectory))
+        {
+            return false;
+        }
+
+        if (string.Equals(
+                Path.GetFullPath(sourceDirectory).TrimEnd(Path.DirectorySeparatorChar),
+                Path.GetFullPath(portableDirectory).TrimEnd(Path.DirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // Never overwrite: if this copy already has its own history, it is not a first run.
+        if (File.Exists(Path.Combine(portableDirectory, "history.json")))
+        {
+            return false;
+        }
+
+        string[] importable =
+        [
+            "history.json",
+            "settings.json",
+        ];
+
+        foreach (var name in importable)
+        {
+            var source = Path.Combine(sourceDirectory, name);
+            if (!File.Exists(source))
+            {
+                continue;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(portableDirectory);
+                File.Copy(source, Path.Combine(portableDirectory, name), overwrite: false);
+                copied++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // A single file that cannot be copied must not abort startup; the app simply
+                // begins without it, and the original is untouched.
+            }
+        }
+
+        return copied > 0;
     }
 
     private static Resolution Resolve() => ResolveFor(ApplicationDirectory);
@@ -162,14 +278,25 @@ public static class AppPaths
 /// <summary>Which layout the data directory came from.</summary>
 public enum DataLocationMode
 {
-    /// <summary>Data sits in <c>data\</c> next to the executable, as the installer sets up.</summary>
+    /// <summary>
+    /// Data sits in <c>data\</c> next to the executable. This is the default for every
+    /// layout, portable package included.
+    /// </summary>
     Portable,
 
-    /// <summary>No marker file; data in <c>%LOCALAPPDATA%\MiniClip</c>.</summary>
-    LocalAppData,
-
-    /// <summary>Portable was requested but the install folder is not writable; data went to AppData.</summary>
+    /// <summary>
+    /// The application directory is not writable, so data went to <c>%LOCALAPPDATA%\MiniClip</c>.
+    /// The user is told why.
+    /// </summary>
     LocalAppDataFellBack,
 }
 
-internal readonly record struct Resolution(string Directory, DataLocationMode Mode, string? FallbackReason);
+/// <summary>
+/// The resolved location. <paramref name="MayImportLegacyData"/> is true only for an
+/// installer-created copy, which is allowed to adopt data left in <c>%LOCALAPPDATA%</c>.
+/// </summary>
+internal readonly record struct Resolution(
+    string Directory,
+    DataLocationMode Mode,
+    string? FallbackReason,
+    bool MayImportLegacyData = false);

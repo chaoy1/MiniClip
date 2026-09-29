@@ -552,21 +552,58 @@ public static class SelfTest
                 && Directory.Exists(expectedData),
                 $"mode={portable.Mode} dir={DiagnosticsLog.Shorten(portable.Directory)} insideAppDir={IsInside(portable.Directory, writableApp)}");
 
-            // 2. No marker: the documented %LOCALAPPDATA% behaviour must be preserved.
+            // 2. No marker at all: data beside the executable is the DEFAULT. A user who just
+            //    unzips the package gets a self-contained copy without having to know about
+            //    any marker file.
             var plainApp = Path.Combine(probeRoot, "plain-install");
             Directory.CreateDirectory(plainApp);
 
-            var legacy = AppPaths.ResolveFor(plainApp);
+            var plain = AppPaths.ResolveFor(plainApp);
+            var plainExpected = Path.Combine(plainApp, AppPaths.DataFolderName);
             noMarker = Report(
-                "data location legacy",
-                legacy.Mode == DataLocationMode.LocalAppData
-                && string.Equals(legacy.Directory, AppPaths.LegacyDataDirectory, StringComparison.OrdinalIgnoreCase),
-                $"mode={legacy.Mode} dir={DiagnosticsLog.Shorten(legacy.Directory)}");
+                "data location default portable",
+                plain.Mode == DataLocationMode.Portable
+                && string.Equals(plain.Directory, plainExpected, StringComparison.OrdinalIgnoreCase)
+                && !plain.MayImportLegacyData,
+                $"mode={plain.Mode} insideAppDir={IsInside(plain.Directory, plainApp)} mayImport={plain.MayImportLegacyData}");
 
-            // 3. The case that actually matters for correctness: portable requested but the
-            //    folder cannot be written. This is what happens if a user installs into
-            //    C:\Program Files without admin rights, and the app must not lose the
-            //    history or crash — it must fall back and say why.
+            // 2b. The marker's remaining job: authorise adopting existing %LOCALAPPDATA% data.
+            //     Only an installer-created copy may do that — a build run from bin\ must not
+            //     help itself to the real installation's history.
+            var markedApp = Path.Combine(probeRoot, "marked-install");
+            Directory.CreateDirectory(markedApp);
+            File.WriteAllText(Path.Combine(markedApp, AppPaths.PortableMarkerName), "portable");
+
+            var marked = AppPaths.ResolveFor(markedApp);
+            var importOk = marked.Mode == DataLocationMode.Portable && marked.MayImportLegacyData;
+
+            // 2c. And the import itself: an existing history must actually arrive, and must
+            //     never overwrite data this copy already owns.
+            var importSource = Path.Combine(probeRoot, "fake-legacy");
+            var importTarget = Path.Combine(markedApp, AppPaths.DataFolderName);
+            Directory.CreateDirectory(importSource);
+            File.WriteAllText(Path.Combine(importSource, "history.json"), "[\"from legacy\"]");
+
+            var copied = CopyLegacyForTest(importSource, importTarget);
+            var arrived = File.Exists(Path.Combine(importTarget, "history.json"))
+                          && File.ReadAllText(Path.Combine(importTarget, "history.json")).Contains("from legacy");
+
+            // Second run must not clobber: overwrite an existing target and re-import.
+            File.WriteAllText(Path.Combine(importTarget, "history.json"), "[\"mine\"]");
+            var copiedAgain = CopyLegacyForTest(importSource, importTarget);
+            var preserved = File.ReadAllText(Path.Combine(importTarget, "history.json")).Contains("mine");
+
+            var importReport = Report(
+                "data location legacy import",
+                importOk && copied > 0 && arrived && copiedAgain == 0 && preserved,
+                $"mayImport={marked.MayImportLegacyData} copied={copied} arrived={arrived} secondCopy={copiedAgain} keptOwnData={preserved}");
+
+            noMarker += importReport;
+
+            // 3. The case that actually matters for correctness: the folder cannot be written.
+            //    This is what happens if a user installs into C:\Program Files without admin
+            //    rights, and the app must not lose the history or crash — it must fall back
+            //    and say why.
             var blocked = Path.Combine(probeRoot, "ReadOnly-install");
             Directory.CreateDirectory(blocked);
             File.WriteAllText(Path.Combine(blocked, AppPaths.PortableMarkerName), "portable");
@@ -633,6 +670,16 @@ public static class SelfTest
         var b = Path.GetFullPath(parent).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         return a.StartsWith(b, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Runs the legacy-data import against throwaway directories.
+    /// </summary>
+    /// <remarks>
+    /// The production entry point reads from the real <c>%LOCALAPPDATA%</c>; a test must never
+    /// touch that, so it drives the injectable overload with directories it owns.
+    /// </remarks>
+    private static int CopyLegacyForTest(string sourceDirectory, string portableDirectory) =>
+        AppPaths.TryImportFrom(sourceDirectory, portableDirectory, out var copied) ? copied : 0;
 
     private static int CheckHistoryFailureSafety(string output)
     {

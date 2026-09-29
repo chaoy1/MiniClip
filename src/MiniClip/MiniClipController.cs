@@ -93,12 +93,22 @@ public sealed class MiniClipController : IDisposable
             return false;
         }
 
-        // The installer asks for the data to live beside the executable so that uninstalling
-        // can remove every trace. If that folder turned out to be unwritable — the classic
-        // case is installing into C:\Program Files without administrator rights — the app
-        // has already fallen back to the user data directory. Say so, once, because
-        // "my history is somewhere else than I was told" is exactly the kind of thing a
-        // silent fallback makes impossible to diagnose.
+        // Prepare the data directory before anything reads history or settings. Data lives
+        // beside the executable by default — which is what makes an unpacked copy leave
+        // nothing behind elsewhere — and a copy the installer created is additionally
+        // allowed to adopt data left in %LOCALAPPDATA% by an earlier version. §12.
+        if (AppPaths.EnsureDataDirectory())
+        {
+            LastNotice = "已把原有历史导入到程序目录";
+            Diagnostics.DiagnosticsLog.Write(
+                "startup",
+                $"imported legacy data into {Diagnostics.DiagnosticsLog.Shorten(AppPaths.DataDirectory)}");
+        }
+
+        // If the application folder refuses writes — the classic case is installing into
+        // C:\Program Files without administrator rights — the app has already fallen back to
+        // the user data directory. Say so, once, because "my history is somewhere else than
+        // I was told" is exactly what a silent fallback makes impossible to diagnose.
         if (AppPaths.Mode == DataLocationMode.LocalAppDataFellBack)
         {
             LastNotice = "安装目录不可写，历史已改存到用户数据目录";
