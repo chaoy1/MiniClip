@@ -53,29 +53,52 @@ if (-not $version) {
 
 New-Item -ItemType Directory -Path $stagingDir, $outputDir -Force | Out-Null
 
-Write-Host "Publishing MiniClip $version (self-contained win-x64)..."
-& $DotnetExe publish $projectPath -c Release -r win-x64 --self-contained true '-p:PublishSingleFile=false' -o $stagingDir
-if ($LASTEXITCODE -ne 0) {
-    throw "dotnet publish failed with exit code $LASTEXITCODE"
-}
+# The staging publish is a full self-contained runtime: ~156 MB across 269 files. It is an
+# intermediate, not a deliverable, so it must not survive the build. An earlier version of
+# this script left every one of them behind, and a dozen builds silently accumulated over
+# 2 GB in artifacts\installer — with no clue from the output that anything was wrong.
+try {
+    Write-Host "Publishing MiniClip $version (self-contained win-x64, staging)..."
+    & $DotnetExe publish $projectPath -c Release -r win-x64 --self-contained true '-p:PublishSingleFile=false' -o $stagingDir
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish failed with exit code $LASTEXITCODE"
+    }
 
-$publishedExe = Join-Path $stagingDir 'MiniClip.exe'
-if (-not (Test-Path -LiteralPath $publishedExe)) {
-    throw "Publish completed without MiniClip.exe: $stagingDir"
-}
+    $publishedExe = Join-Path $stagingDir 'MiniClip.exe'
+    if (-not (Test-Path -LiteralPath $publishedExe)) {
+        throw "Publish completed without MiniClip.exe: $stagingDir"
+    }
 
-Write-Host 'Compiling MiniClip installer...'
-& $IsccExe "/DPublishDir=$stagingDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" $scriptPath
-if ($LASTEXITCODE -ne 0) {
-    throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
-}
+    Write-Host 'Compiling MiniClip installer...'
+    & $IsccExe "/DPublishDir=$stagingDir" "/DOutputDir=$outputDir" "/DAppVersion=$version" $scriptPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
+    }
 
-$installerPath = Join-Path $outputDir "MiniClip-Setup-$version-x64.exe"
-if (-not (Test-Path -LiteralPath $installerPath)) {
-    throw "Inno Setup completed without the expected installer: $installerPath"
-}
+    $installerPath = Join-Path $outputDir "MiniClip-Setup-$version-x64.exe"
+    if (-not (Test-Path -LiteralPath $installerPath)) {
+        throw "Inno Setup completed without the expected installer: $installerPath"
+    }
 
-$hash = Get-FileHash -LiteralPath $installerPath -Algorithm SHA256
-Write-Host "Installer: $installerPath"
-Write-Host "SHA256: $($hash.Hash)"
-Write-Host "Published files: $stagingDir"
+    $installer = Get-Item -LiteralPath $installerPath
+    Write-Host "Installer: $installerPath"
+    Write-Host "Size: $($installer.Length) bytes"
+    Write-Host "SHA256: $((Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash)"
+}
+catch {
+    # On failure the staging directory is the only copy of the publish output and the thing
+    # you would inspect, so it is deliberately kept. Say where it is.
+    Write-Warning "Build failed; staging directory kept for inspection: $stagingDir"
+    throw
+}
+finally {
+    if (Test-Path -LiteralPath $stagingDir) {
+        Remove-Item -LiteralPath $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $stagingDir) {
+            Write-Warning "Could not remove the staging directory (a file may still be in use): $stagingDir"
+        }
+        else {
+            Write-Host 'Staging directory removed.'
+        }
+    }
+}
