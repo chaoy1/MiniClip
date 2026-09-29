@@ -14,6 +14,11 @@ data/
 __pycache__/
 *.pyc
 
+# Per-machine build tool locations (see docs/BUILD.md).
+# Keeps a developer's own SDK/Inno Setup paths out of the repository: the committed
+# script must stay free of absolute paths that are only right on one machine.
+local.build.json
+
 # Editors and operating system
 .vs/
 .vscode/

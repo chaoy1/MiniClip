@@ -66,6 +66,20 @@
     <AnalysisLevel>latest</AnalysisLevel>
   </PropertyGroup>
 
+  <!-- Release ships without debug symbols, deliberately.
+       A portable PDB records every source file as an absolute path, and the compiler also
+       writes the output PDB's own absolute path into the assembly's CodeView debug
+       directory. Both used to travel into the installer and the portable zip, so anyone who
+       unzipped the product could read the developer's local folder layout
+       (D:\Documents\Projects\MiniClip\...). Nothing in a shipped build needs symbols: the
+       diagnostic log records exception *type names*, never stack traces. Debug builds keep
+       full symbols, so real debugging is unaffected. If a Release build ever does need
+       line numbers locally, build with -p:DebugType=portable and do not ship the PDB. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
   <ItemGroup>
     <Resource Include="Assets\miniclip.ico" />
     <Resource Include="Assets\miniclip-tray.ico" />

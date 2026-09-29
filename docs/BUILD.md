@@ -17,6 +17,24 @@ dotnet --list-sdks
 
 输出中应包含 `10.` 开头的版本。如果系统 `PATH` 中的 `dotnet` 只有运行时，请调用实际安装的 .NET 10 SDK 可执行文件，或使用安装脚本的 `-DotnetExe` 参数。
 
+**仓库里没有任何写死的本机路径。** 构建脚本按以下顺序寻找 SDK，第一个真正报出 `10.x` SDK 的生效（只有运行时的 `dotnet` 不会被误用）：
+
+1. 命令行 `-DotnetExe`
+2. `tools\local.build.json`（本机配置，已被 Git 忽略）
+3. 环境变量 `MINICLIP_DOTNET`
+4. `PATH` 中的 `dotnet.exe`
+5. 常规安装位置：`%ProgramFiles%\dotnet`、`%ProgramFiles(x86)%\dotnet`、`%LOCALAPPDATA%\Microsoft\dotnet`
+
+若你的 SDK 装在非常规位置（便携解压、另一个盘符等），在 `tools\local.build.json` 里写一次即可，**不要**把它提交进仓库：
+
+```json
+{
+  "dotnetExe": "D:\\Software\\.NET\\dotnet-sdk\\dotnet.exe"
+}
+```
+
+Inno Setup 同理：`isccExe` 字段、环境变量 `MINICLIP_ISCC`、`-IsccExe` 参数三者优先级相同。
+
 ## 构建与运行
 
 ```powershell
@@ -56,6 +74,8 @@ Compress-Archive -Path release\MiniClip-1.0.0-win-x64\* `
   -DotnetExe 'C:\path\to\dotnet.exe' `
   -IsccExe 'C:\path\to\ISCC.exe'
 ```
+
+`Release` 构建设置了 `DebugType=none`，**不生成 PDB**。这是有意为之：PDB 会把源码文件的绝对路径逐个记下来，编译器还会把输出 PDB 自身的绝对路径写进程序集的 CodeView 调试目录，两者都会随安装包和 zip 一起发出去，暴露开发机的目录结构与用户名。运行时并不需要符号——诊断日志只记录异常**类型名**，从不写堆栈。Debug 配置仍保留完整符号，本地调试不受影响；若某次确实需要 Release 的行号，用 `-p:DebugType=portable` 单独构建，并且不要把 PDB 发出去。
 
 安装包输出到 `dist\MiniClip-Setup-<版本>-x64.exe`。脚本会打印文件大小和 SHA-256。发布前请确认安装包与免安装压缩包版本一致，并在目标 Windows 环境执行安装、启动、升级和卸载检查。
 
