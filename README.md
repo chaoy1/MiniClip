@@ -1,5 +1,9 @@
 # MiniClip
 
+<img src="docs/images/app-icon.png" alt="MiniClip 应用图标" width="96">
+
+**语言：** 简体中文 · [English](README.en.md)
+
 MiniClip 是一款适用于 Windows 10/11 的文本剪贴板历史工具。按下全局快捷键后，它会在输入位置附近显示历史记录；使用方向键选择，按 Enter 粘贴。候选窗口不会获取键盘焦点，原输入窗口保持活动状态。
 
 [下载最新版本](https://github.com/chaoy1/MiniClip/releases/latest) · [构建与发布](docs/BUILD.md) · [验证说明](docs/VERIFICATION.md)
