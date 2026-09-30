@@ -2,7 +2,7 @@
 
 # MiniClip
 
-<img src="docs/images/app-icon.png" alt="MiniClip 应用图标" width="80">
+<p align="center"><img src="docs/images/app-icon.png" alt="MiniClip 应用图标" width="160"></p>
 
 > 适用于 Windows 10/11 的文本剪贴板历史工具。在文字光标附近打开候选窗口，用键盘选回复制过的文本；候选窗口不抢焦点，原输入窗口保持活动状态。
 

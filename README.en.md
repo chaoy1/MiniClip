@@ -2,7 +2,7 @@
 
 # MiniClip
 
-<img src="docs/images/app-icon.png" alt="MiniClip application icon" width="80">
+<p align="center"><img src="docs/images/app-icon.png" alt="MiniClip application icon" width="160"></p>
 
 > A text-only clipboard history app for Windows 10 and 11. Open a popup near the text cursor and select previously copied text with the keyboard. The popup does not take focus, so the original input window remains active.
 
